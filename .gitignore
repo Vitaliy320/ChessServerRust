@@ -1,2 +1,4 @@
 /target
 /chesslib_Rust
+/.idea
+Cargo.lock
