@@ -1,7 +1,9 @@
 mod server;
-mod server2;
 mod game;
 mod command;
+mod game_repository;
+mod response;
+mod request;
 
 use chesslib::board::Board;
 use std::io::{self, Write};
@@ -9,7 +11,7 @@ use tokio::net::TcpListener;
 
 // #[tokio::main]
 fn main() {
-    let a = server2::start_server();
+    let a = server::start_server();
 }
 // fn main() {
     // let columns = "abcdefgh";
