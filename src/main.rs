@@ -4,6 +4,8 @@ mod command;
 mod game_repository;
 mod response;
 mod request;
+mod http_server;
+mod websocket_server;
 
 use chesslib::board::Board;
 use std::io::{self, Write};
@@ -11,7 +13,7 @@ use tokio::net::TcpListener;
 
 // #[tokio::main]
 fn main() {
-    let a = server::start_server();
+    let a = server::run_server();
 }
 // fn main() {
     // let columns = "abcdefgh";
