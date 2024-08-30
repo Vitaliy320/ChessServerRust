@@ -1,9 +1,47 @@
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use uuid::Uuid;
-
+use postgres::{Client, NoTls, Error as PostgresError};
+use std::net::{TcpListener, TcpStream};
+use std::io::{Read, Write};
+use std::env;
+// use tokio_tungstenite::tungstenite::protocol::Role::Client;
 use crate::game::Game;
 use crate::game::GameStatus;
+
+// db url
+pub fn set_db() {
+    let db_url = std::env::var("DATABASE_URL");
+
+    const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
+    const NOT_FOUND: &str = "HTTP/1.1 404 NOT FOUnD\r\n\r\n";
+    const INTERNAL_SERVER_ERROR: &str = "HTTP/1.1 500 INTERNAL SERVER ERROR\r\n\r\n";
+
+}
+
+
+//
+// pub fn set_database() -> Result<(), PostgresError> {
+//     let mut client = Client::connect(DB_URL, NoTls)?;
+//
+//     client.execute(
+//         "CREATE TABLE IF NOT EXISTS games (\
+//
+//         )"
+//     )
+// }
+
+
+
+
+
+
+
+
+
+
+
+
 
 pub struct GameRepository {
     games_dict: HashMap<Uuid, Game>,

@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
-use chesslib::board::Board;
+use crate::chess_engine::board::Board;
 #[derive(Clone, Debug)]
 pub enum GameStatus {
     AwaitingOpponent,
@@ -58,6 +58,7 @@ impl Game {
     }
 
     pub fn set_user(&mut self, user1_id: Option<String>, user2_id: Option<String>) {
+        // todo: refactor
         match user1_id {
             Some(user_id) => self._user1_id = Some(user_id),
             None => (),

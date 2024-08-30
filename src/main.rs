@@ -1,19 +1,34 @@
 mod server;
 mod game;
-mod command;
 mod game_repository;
 mod response;
 mod request;
 mod http_server;
 mod websocket_server;
 
-use chesslib::board::Board;
+mod chess_engine;
+
+use chess_engine::board::Board;
 use std::io::{self, Write};
+use game_repository::set_db;
 use tokio::net::TcpListener;
 
-// #[tokio::main]
-fn main() {
-    let a = server::run_server();
+#[tokio::main]
+async fn main() {
+    set_db();
+    // let columns = "abcdefgh";
+    // let rows = "12345678";
+    // let board_size = 8;
+    // let board_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    //
+    // let mut board = Board::new(
+    //     String::from(columns),
+    //     board_size,
+    //     String::from(rows),
+    //     board_size,
+    //     board_fen.to_string(),
+    // );
+    let a = server::run_server().await;
 }
 // fn main() {
     // let columns = "abcdefgh";
