@@ -15,7 +15,6 @@ use futures_util::{SinkExt, StreamExt};
 
 use crate::websocket_server::run_websocket_server;
 
-#[tokio::main]
 pub async fn run_server() {
     // Channel for broadcasting messages to WebSocket clients
     let (tx, _rx) = broadcast::channel::<String>(100);
@@ -36,6 +35,7 @@ async fn run_http_server(game_repository: Arc<Mutex<GameRepository>>) {
         .route("/join_game", put(join_game))
         .with_state(Arc::clone(&game_repository));
 
-    let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+    let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    println!("HTTP server started");
     axum::serve(listener, api_router).await.unwrap();
 }
