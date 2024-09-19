@@ -12,8 +12,8 @@ use crate::game::Game;
 use crate::game_repository::GameRepository;
 use crate::http_server::{get_games_from_dict, create_game, join_game};
 use futures_util::{SinkExt, StreamExt};
-
 use crate::websocket_server::run_websocket_server;
+
 
 pub async fn run_server() {
     // Channel for broadcasting messages to WebSocket clients
@@ -21,7 +21,9 @@ pub async fn run_server() {
     let tx_ws = tx.clone();
 
     let game_repository = Arc::new(Mutex::new(GameRepository::new()));
-
+    game_repository.lock().unwrap().connect_to_db().await;
+    // set_db().await;
+    // game_repository.lock().unwrap().connect_to_db().await;
     let game_repository_clone = Arc::clone(&game_repository);
     let api_handle = tokio::spawn(run_http_server(game_repository));
     let websocket_handle = tokio::spawn(run_websocket_server(game_repository_clone));

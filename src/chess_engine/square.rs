@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::chess_engine::piece::Piece;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Square {
     _coordinates: (char, char),
     _piece: Option<Arc<Mutex<dyn Piece + Sync + Send>>>,

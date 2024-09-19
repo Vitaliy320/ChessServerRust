@@ -85,24 +85,20 @@ async fn make_move(game_repository: Arc<Mutex<GameRepository>>, game_id: Uuid, u
                         message: format!("Made move from {} to {}", from, to),
                         columns: board.get_columns(),
                         rows: board.get_rows(),
-                        board: board_to_dict(&board),
+                        board: board_to_dict(board),
                     }
                 }
             }
         },
     }
 }
-fn board_to_dict(board: &Board) -> HashMap<String, (String, Vec<String>)> {
+fn board_to_dict(board: &mut Board) -> HashMap<String, (String, Vec<String>)> {
     let mut dict: HashMap<String, (String, Vec<String>)> = HashMap::new();
     // todo: add calculation of possible moves for each piece in given position
 
-    let position = board.get_position();
-    let position = &position.lock().unwrap();
+    let possible_coordinates: Vec<String> = board.get_squares().keys().cloned().collect();
 
-    let possible_coordinates: Vec<String> = position.get_squares().keys().cloned().collect();
-
-    for (coordinates, square) in position.get_squares() {
-        let square = square.lock().unwrap();
+    for (coordinates, square) in board.get_squares() {
         let piece = square.get_piece();
         match piece {
             Some(p) => {
