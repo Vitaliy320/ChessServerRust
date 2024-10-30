@@ -1,4 +1,4 @@
-use crate::chess_engine::piece_new::Piece;
+use crate::chess_engine::piece::Piece;
 
 #[derive(Debug, Clone)]
 pub struct Pawn {

@@ -7,4 +7,3 @@ pub mod piece;
 pub mod queen;
 pub mod rook;
 pub mod square;
-pub mod piece_new;

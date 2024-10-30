@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use crate::chess_engine::piece::Piece;
-use crate::chess_engine::piece_new::PieceEnum;
+use crate::chess_engine::piece::PieceEnum;
 
 pub enum Color {
     White,
@@ -328,7 +328,7 @@ impl Board {
         rows_vector.push("                  ".to_string());
 
         for (row_index, row) in self.rows.chars().rev().enumerate() {
-            board_string = format!("{}\n{} ", board_string, row_index.to_string());
+            board_string = format!("{}\n{} ", board_string, (self.number_of_rows - row_index as u32).to_string());
             for column in self.columns.chars() {
                 let coordinates = format!("{}{}", column, row);
                 let a = self.pieces.get(&coordinates);
