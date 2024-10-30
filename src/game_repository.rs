@@ -20,8 +20,8 @@ use futures_util::TryFutureExt;
 use serde_json::to_string;
 use tokio_tungstenite::tungstenite::client;
 use crate::chess_engine::board::Board;
-use crate::chess_engine::piece::Piece;
-use crate::chess_engine::piece_new::PieceEnum;
+
+use crate::chess_engine::piece::PieceEnum;
 use crate::user::User;
 
 
