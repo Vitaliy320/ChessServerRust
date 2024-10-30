@@ -12,7 +12,7 @@ config = "0.14.0"
 tokio = { version = "1.38.0", features = ["full"] }
 tokio-tungstenite = "0.23.1"
 tokio-websockets = { version = "0.8.3", features = ["server", "sha1_smol"] }
-tokio-postgres = "0.7.1"
+tokio-postgres = { version = "0.7.1", features = ["with-uuid-1"] }
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.117"
 serde_derive = "1.0.209"
@@ -21,9 +21,11 @@ uuid = { version = "1.10.0", features = ["v4", "serde"] }
 diesel = { version = "2.0.0", features = ["postgres", "chrono"] }
 dotenv = "0.15.0"
 diesel_migrations = "2.0.0"
-axum = { version = "0.7.5", features = ["ws"] }
+axum = { version = "0.7.6", features = ["ws", "macros"] }
 hyper = { version = "1.4.1", features = ["full"] }
 tower = "0.4.13"
 
 postgres = { version = "0.19.8", features = ["with-uuid-0_8", "with-serde_json-1"] }
-#chess_engine = { path = "chesslib_Rust" }
+tungstenite = "0.24.0"
+dashmap = "6.1.0"
+futures-channel = "0.3.30"
