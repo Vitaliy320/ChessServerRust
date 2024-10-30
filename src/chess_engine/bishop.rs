@@ -1,7 +1,8 @@
-use crate::chess_engine::piece::Piece;
+use crate::chess_engine::piece_new::Piece;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Bishop {
+    coordinates: (char, char),
     color: char,
     possible_moves: Vec<String>,
     name: String,
@@ -9,17 +10,25 @@ pub struct Bishop {
 }
 
 impl Bishop {
-    pub fn new(color: char) -> Bishop {
+    pub fn new(color: char, coordinates: (char, char)) -> Bishop {
         let symbol = if color.to_lowercase().next() == Some('w') {
             "B".to_string()
         } else {
             "b".to_string()
         };
-        Bishop {color: color,
+        Bishop {
+            coordinates,
+            color,
             possible_moves: Vec::new(),
             name: String::from("Bishop"),
-            symbol: symbol
+            symbol
         }
+    }
+}
+
+impl AsMut<dyn Piece + 'static> for Bishop {
+    fn as_mut(&mut self) -> &mut (dyn Piece + 'static) {
+        self
     }
 }
 
@@ -39,6 +48,30 @@ impl Piece for Bishop {
     fn get_symbol(&self) -> String {
         self.symbol.clone()
     }
+
+    fn get_color(&self) -> char {
+        self.color.clone()
+    }
+
+    // fn as_mut(self: Box<Self>) -> Box<(dyn Piece)> {
+    //     self
+    // }
+
+    fn get_coordinates_string(&self) -> String { format!("{}{}", self.coordinates.0.clone(), self.coordinates.1.clone()) }
+
+    fn set_coordinates(&mut self, coordinates: (char, char)) {
+        self.coordinates = coordinates;
+    }
+
+    fn set_coordinates_string(&mut self, coordinates: String) {
+        if coordinates.len() != 2 {
+            return;
+        }
+        self.coordinates = (coordinates.chars().nth(0).unwrap(),
+                            coordinates.chars().nth(1).unwrap());
+    }
+
+    fn get_name(&self) -> String { self.name.clone() }
 }
 
 unsafe impl Send for Bishop {}

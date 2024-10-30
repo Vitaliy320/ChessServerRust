@@ -1,7 +1,8 @@
-use crate::chess_engine::piece::Piece;
+use crate::chess_engine::piece_new::Piece;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Rook {
+    coordinates: (char, char),
     color: char,
     possible_moves: Vec<String>,
     name: String,
@@ -9,17 +10,25 @@ pub struct Rook {
 }
 
 impl Rook {
-    pub fn new(color: char) -> Rook {
+    pub fn new(color: char, coordinates: (char, char)) -> Rook {
         let symbol = if color.to_lowercase().next() == Some('w') {
             "R".to_string()
         } else {
             "r".to_string()
         };
-        Rook {color,
+        Rook {
+            coordinates,
+            color,
             possible_moves: Vec::new(),
             name: String::from("Rook"),
             symbol,
         }
+    }
+}
+
+impl AsMut<dyn Piece + 'static> for Rook {
+    fn as_mut(&mut self) -> &mut (dyn Piece + 'static) {
+        self
     }
 }
 
@@ -39,6 +48,30 @@ impl Piece for Rook {
     fn get_symbol(&self) -> String {
         self.symbol.clone()
     }
+
+    fn get_color(&self) -> char {
+        self.color.clone()
+    }
+
+    // fn as_mut(self: Box<Rook>) -> Box<Rook> {
+    //     self
+    // }
+
+    fn get_coordinates_string(&self) -> String { format!("{}{}", self.coordinates.0, self.coordinates.1) }
+
+    fn set_coordinates(&mut self, coordinates: (char, char)) {
+        self.coordinates = coordinates;
+    }
+
+    fn set_coordinates_string(&mut self, coordinates: String) {
+        if coordinates.len() != 2 {
+            return;
+        }
+        self.coordinates = (coordinates.chars().nth(0).unwrap(),
+                            coordinates.chars().nth(1).unwrap());
+    }
+
+    fn get_name(&self) -> String { self.name.clone() }
 }
 
 unsafe impl Send for Rook {}

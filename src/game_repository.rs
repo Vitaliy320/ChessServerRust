@@ -11,17 +11,19 @@ use std::sync::{Arc, Mutex};
 use diesel::RunQueryDsl;
 // use tokio_tungstenite::tungstenite::protocol::Role::Client;
 use crate::game::Game;
-use crate::game::GameStatus;
+use crate::game_status::GameStatus;
 use dotenv::dotenv;
 use config::Config;
 use postgres::types::ToSql;
 use futures_util::future::join_all;
 use futures_util::TryFutureExt;
+use serde_json::to_string;
+use tokio_tungstenite::tungstenite::client;
+use crate::chess_engine::board::Board;
+use crate::chess_engine::piece::Piece;
+use crate::chess_engine::piece_new::PieceEnum;
 use crate::user::User;
 
-const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n";
-const NOT_FOUND: &str = "HTTP/1.1 404 NOT FOUND\r\n\r\n";
-const INTERNAL_SERVER_ERROR: &str = "HTTP/1.1 500 INTERNAL SERVER ERROR\r\n\r\n";
 
 pub struct GameRepository {
     db_client: Option<Client>,
@@ -77,7 +79,7 @@ impl GameRepository {
                 }
             }).collect();
 
-        let _ = self.add_users_batch_to_users(users).await;
+        // let _ = self.add_users_batch_to_users(users).await;
 
         let users = self.get_users().await;
         match users {
@@ -153,6 +155,273 @@ impl GameRepository {
         }
     }
 
+    pub async fn add_game_to_games(&self, game: &mut Game) -> Result<Uuid, String> {
+        match &self.db_client {
+            Some(db_client) => {
+                let e = db_client.execute("CREATE TABLE IF NOT EXISTS games (\
+                id UUID PRIMARY KEY,
+                board_id INT NOT NULL,
+                user1_id TEXT,
+                user2_id TEXT,
+                white_id TEXT,
+                black_id TEXT,
+                status VARCHAR NOT NULL,
+                FOREIGN KEY (board_id) REFERENCES boards (id) ON DELETE CASCADE
+                );", &[]).await;
+
+                match game.get_board() {
+                    Some(board) => {
+                        match self.add_board_to_boards(board).await {
+                            Ok(board_id) => {
+                                let result = db_client.query_one("
+                                INSERT INTO games (id, board_id, user1_id, user2_id, white_id,
+                                black_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+                                &[
+                                    &game.get_game_id(),
+                                    &board_id,
+                                    &game.get_user1_id(),
+                                    &game.get_user2_id(),
+                                    &game.get_white_id(),
+                                    &game.get_black_id(),
+                                    &game.get_game_status(),
+                                ]).await;
+
+                                match result {
+                                    Ok(row) => {
+                                        let game_id: Uuid = row.get::<usize, Uuid>(0);
+                                        println!("Game created successfully");
+                                        Ok(game_id)
+                                    },
+                                    Err(_) => Err("Could not add game".to_string()),
+                                }
+                            },
+                            Err(e) => Err(e),
+                        }
+                    },
+                    _ => Err("Could not find the board".to_string()),
+                }
+            },
+            _ => Err("Could not connect to the database".to_string()),
+        }
+    }
+
+    pub async fn get_game_by_id(&self, id: Uuid) -> Result<Game, String> {
+        match &self.db_client {
+            None => Err("Could not connect to the database".to_string()),
+            Some(db_client) => {
+                let result = db_client.query_one("\
+                SELECT id, board_id, user1_id, user2_id, white_id, black_id, status
+                FROM games WHERE id = $1", &[&id]).await;
+
+                match result {
+                    Ok(row) => {
+                        let board_id = row.get("board_id");
+                        let board = self.get_board_by_id(board_id).await;
+                        match board {
+                            Ok(board) => {
+                                let game = Game::create_game_from_db(
+                                    row.get("id"),
+                                    board_id,
+                                    row.get("user1_id"),
+                                    row.get("user2_id"),
+                                    row.get("white_id"),
+                                    row.get("black_id"),
+                                    row.get("status"),
+                                    board,
+                                );
+                                Ok(game)
+                            },
+                            _ => Err("Could not get the board".to_string())
+                        }
+                    },
+                    Err(_) => Err("Could not get the board".to_string()),
+                }
+            }
+        }
+    }
+
+    pub async fn add_board_to_boards(&self, board: &mut Board) -> Result<i32, String> {
+        match &self.db_client {
+            Some(db_client) => {
+                let e = db_client.execute("
+                CREATE TABLE IF NOT EXISTS boards (
+                id SERIAL PRIMARY KEY,
+                active_color CHAR(1) NOT NULL,
+                castle_options TEXT NOT NULL,
+                en_passant_square TEXT,
+                half_move_clock INT,
+                full_move_number INT,
+                number_of_columns INT NOT NULL,
+                number_of_rows INT NOT NULL,
+                columns TEXT NOT NULL,
+                rows TEXT NOT NULL
+                );"
+                ,&[]).await;
+
+                let active_color =      board.get_active_color().to_string();
+                let castle_options =    board.get_castle_options();
+                let en_passant_square = board.get_en_passant_square();
+                let half_move_clock =     board.get_half_move_clock().unwrap();
+                let full_move_number =    board.get_full_move_number().unwrap();
+                let number_of_columns =  board.get_number_of_columns() as i32;
+                let number_of_rows =     board.get_number_of_rows() as i32;
+                let columns =           board.get_columns();
+                let rows =              board.get_rows();
+
+                let query = "
+                INSERT INTO boards (active_color, castle_options, en_passant_square, half_move_clock, full_move_number,
+                number_of_columns, number_of_rows, columns, rows) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                RETURNING id";
+
+                let result = db_client.query_one(query,
+            &[
+                    &active_color,
+                    &castle_options,
+                    &en_passant_square,
+                    &half_move_clock,
+                    &full_move_number,
+                    &number_of_columns,
+                    &number_of_rows,
+                    &columns,
+                    &rows,
+                ]).await;
+                match result {
+                    Ok(row) => {
+                        let board_id: i32 = row.get::<usize, i32>(0);
+                        match self.add_pieces_to_pieces(board_id, board.get_pieces_vec()).await {
+                            Ok(_) => {
+                                //todo: move board.set_id(board_id) to on_game_added() after its creation
+                                board.set_id(board_id);
+                                Ok(board_id)
+                            },
+                            Err(e) => Err(e),
+                        }
+                    },
+                    Err(e) => {
+                        let a = 1;
+                        Err("Could not add board to boards".to_string())
+                    },
+                }
+            },
+            _ => Err("Could not connect to the database".to_string()),
+        }
+    }
+
+    pub async fn add_pieces_to_pieces(&self, board_id: i32, pieces: Vec<PieceEnum>) -> Result<(), String> {
+        match &self.db_client {
+            None => Err("Could not connect to database".to_string()),
+            Some(db_client) => {
+                let e = db_client.execute("
+                CREATE TABLE IF NOT EXISTS pieces (
+                id SERIAL PRIMARY KEY,
+                board_id INT NOT NULL,
+                coordinates TEXT NOT NULL,
+                color TEXT NOT NULL,
+                name TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                FOREIGN KEY (board_id) REFERENCES boards (id) ON DELETE CASCADE
+                );", &[]).await;
+
+                let mut results: Vec<bool> = Vec::new();
+
+                for mut piece in pieces {
+                    let result = db_client.query("
+                    INSERT INTO pieces (board_id, coordinates, color, name, symbol) VALUES
+                    ($1, $2, $3, $4, $5)", &[
+                        &board_id,
+                        &piece.get_coordinates_string(),
+                        &piece.get_color().to_string(),
+                        &piece.get_name(),
+                        &piece.get_symbol(),
+                    ]).await;
+
+                    match result {
+                        Ok(_) => results.push(true),
+                        _ => results.push(false),
+                    }
+                }
+
+                match results.iter().all(|&x| x) {
+                    true => Ok(()),
+                    false => Err("Could not add piece".to_string()),
+                }
+            }
+        }
+    }
+
+    pub async fn get_board_by_id(&self, id: i32) -> Result<Board, String> {
+        match &self.db_client {
+            None => Err("Could not connect to the database".to_string()),
+            Some(db_client) => {
+                let result = db_client.query_one("\
+                SELECT id, active_color, castle_options, en_passant_square,
+                half_move_clock, full_move_number, number_of_columns, number_of_rows, columns, rows
+                FROM boards WHERE id = $1", &[&id]).await;
+
+                match result {
+                    Err(_) => Err("Could not get the board".to_string()),
+                    Ok(row) => {
+                        let active_color: String = row.get("active_color");
+                        let active_color = active_color.chars().nth(0).unwrap();
+
+                        let pieces = self.get_pieces_by_board_id(id.clone()).await;
+
+                        match pieces {
+                            Err(e) => Err(e),
+                            Ok(pieces) => Ok(
+                                Board::create_board_from_db(
+                                    row.get("id"),
+                                    pieces,
+                                    active_color,
+                                    row.get("castle_options"),
+                                    row.get("en_passant_square"),
+                                    row.get("half_move_clock"),
+                                    row.get("full_move_number"),
+                                    row.get("number_of_columns"),
+                                    row.get("number_of_rows"),
+                                    row.get("columns"),
+                                    row.get("rows"),
+                                )),
+                        }
+                    }
+                }
+            },
+        }
+    }
+
+    pub async fn get_pieces_by_board_id(&self, id: i32) -> Result<HashMap<String, Option<PieceEnum>>, String>{
+        match &self.db_client {
+            None => Err("Could not connect to the database".to_string()),
+            Some(db_client) => {
+                let result = db_client.query("\
+                SELECT id, board_id, coordinates, color, name, symbol
+                from pieces where board_id = $1", &[&id]).await;
+                match result {
+                    Err(_) => Err("Could not get pieces".to_string()),
+                    Ok(rows) => {
+                        let mut pieces: HashMap<String, Option<PieceEnum>> = HashMap::new();
+                        for row in rows {
+                            let coordinates: String = row.get("coordinates");
+                            let coordinates = (coordinates.chars().nth(0).unwrap(), coordinates.chars().nth(1).unwrap());
+                            let color: String = row.get("color");
+                            let color = color.chars().nth(0).unwrap();
+
+                            let symbol: String = row.get("symbol");
+                            let symbol = symbol.chars().nth(0).unwrap();
+
+                            let piece = PieceEnum::new(
+                                coordinates,
+                                symbol,
+                            );
+                            pieces.insert(piece.get_coordinates_string(), Some(piece));
+                        }
+                        Ok(pieces)
+                    }
+                }
+            }
+        }
+    }
+
     pub fn add_game(
         &mut self,
         game: Game,
@@ -162,7 +431,7 @@ impl GameRepository {
         Ok("Game added successfully".to_string())
     }
 
-    pub fn get_game_by_id(&mut self, game_id: Uuid) -> Option<&mut Game> {
+    pub fn get_game_by_id_from_dict(&mut self, game_id: Uuid) -> Option<&mut Game> {
         self.games_dict.get_mut(&game_id)
     }
 
