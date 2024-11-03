@@ -266,8 +266,8 @@ impl GameRepository {
                 let active_color =      board.get_active_color_string();
                 let castle_options =    board.get_castle_options();
                 let en_passant_square = board.get_en_passant_square();
-                let half_move_clock =     board.get_half_move_clock().unwrap();
-                let full_move_number =    board.get_full_move_number().unwrap();
+                let half_move_clock =     board.get_half_move_clock();
+                let full_move_number =    board.get_full_move_number();
                 let number_of_columns =   board.get_number_of_columns() as i32;
                 let number_of_rows =      board.get_number_of_rows() as i32;
                 let columns =           board.get_columns();
