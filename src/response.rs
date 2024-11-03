@@ -5,6 +5,9 @@ use axum::Json;
 use axum::response::{Response as AxumResponse, IntoResponse};
 use uuid::Uuid;
 use serde::{Deserialize, Serialize};
+use crate::game::Game;
+use crate::game_status::GameStatus;
+use crate::game_end_condition::GameEndCondition;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Response {
@@ -23,6 +26,8 @@ pub enum Response {
         columns: String,
         rows: String,
         board: HashMap<String, (String, Vec<String>)>,
+        game_status: GameStatus,
+        game_end_condition: GameEndCondition,
     },
     RequestFailedResponse { message: String, }
 }
@@ -64,13 +69,18 @@ impl IntoResponse for Response {
                 message,
                 columns,
                 rows,
-                board} => {
+                board,
+                game_status,
+                game_end_condition,
+            } => {
                 let body = Json(serde_json::json!({
                     "game_id": game_id,
                     "message": message,
                     "columns": columns,
                     "rows": rows,
                     "board": board,
+                    "game_status": game_status.to_string(),
+                    "game_end_condition": game_end_condition.to_string(),
                 }));
                 (StatusCode::OK, body).into_response()
             },

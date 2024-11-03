@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 use crate::game_status::GameStatus;
 use crate::chess_engine::board::Board;
+use crate::game_end_condition::GameEndCondition;
 
 #[derive(Clone, Debug)]
 pub struct Game {
@@ -13,6 +14,7 @@ pub struct Game {
     white_id: Option<String>,
     black_id: Option<String>,
     status: GameStatus,
+    game_end_condition: GameEndCondition,
     board: Option<Board>,
 }
 
@@ -32,7 +34,7 @@ impl Game {
         //todo: replace uuid with i32. When the board is created, the board_id field will be updated
         let game_id = Uuid::new_v4();
 
-        let board = Board::create_board_from_fen(columns, board_size, rows, board_size, board_fen);
+        let board = Board::new_from_fen(columns, board_size, rows, board_size, board_fen);
 
         let mut game = Game {
             game_id,
@@ -41,6 +43,7 @@ impl Game {
             white_id,
             black_id,
             status: GameStatus::AwaitingOpponent,
+            game_end_condition: GameEndCondition::None,
             board_id: None,
             board: Some(board),
         };
@@ -62,6 +65,7 @@ impl Game {
         white_id: Option<String>,
         black_id: Option<String>,
         status: GameStatus,
+        game_end_condition: GameEndCondition,
         board: Board) -> Game {
         Game {
             game_id,
@@ -72,6 +76,7 @@ impl Game {
             black_id,
             board: Some(board),
             status,
+            game_end_condition,
         }
     }
 
@@ -128,6 +133,9 @@ impl Game {
 
     pub fn get_game_status(&self) -> GameStatus {
         self.status.clone()
+    }
+    pub fn get_game_end_condition(&self) -> GameEndCondition {
+        self.game_end_condition.clone()
     }
 
     pub fn get_users(&self) -> (Option<String>, Option<String>) {

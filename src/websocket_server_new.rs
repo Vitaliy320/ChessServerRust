@@ -23,6 +23,8 @@ use crate::request;
 use crate::response::Response;
 use crate::response::Response::RequestFailedResponse;
 use crate::Board;
+use crate::game_end_condition::GameEndCondition;
+use crate::game_status::GameStatus;
 
 type Tx = UnboundedSender<Message>;
 type PeerMap = Arc<Mutex<HashMap<SocketAddr, Tx>>>;
@@ -148,13 +150,15 @@ async fn make_move(
     from: String,
     to: String
 ) -> Response {
-    let response = match game_manager.write().await.get_game_by_id(&game_id).await {
+    let response = match game_manager.write().await.get_mutable_game_by_id(&game_id).await {
         Err(_) => Response::MakeMoveResponse {
             game_id,
             message: "Game does not exist".to_string(),
             columns: "".to_string(),
             rows: "".to_string(),
             board: HashMap::new(),
+            game_status: GameStatus::Aborted,
+            game_end_condition: GameEndCondition::None,
         },
         Ok(mut game) => {
             match game.get_board() {
@@ -164,6 +168,8 @@ async fn make_move(
                     columns: "".to_string(),
                     rows: "".to_string(),
                     board: HashMap::new(),
+                    game_status: game.get_game_status(),
+                    game_end_condition: game.get_game_end_condition(),
                 },
                 Some(board) => {
                     // self.game.as_mut().unwrap().get_board().unwrap().make_move_str("e2".to_string(), "e4".to_string());
@@ -181,6 +187,8 @@ async fn make_move(
                         columns: board.get_columns(),
                         rows: board.get_rows(),
                         board: board_to_dict(board),
+                        game_status: game.get_game_status(),
+                        game_end_condition: game.get_game_end_condition(),
                     }
                 }
             }

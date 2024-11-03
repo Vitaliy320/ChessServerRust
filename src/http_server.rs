@@ -7,6 +7,7 @@ use axum::extract::{Json, State};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tokio_postgres::types::ToSql;
+use uuid::Uuid;
 use crate::connection_manager::ConnectionManager;
 use crate::request::{
     RequestEnum,
@@ -73,6 +74,8 @@ pub async fn join_game(
 ) -> AxumResponse {
     println!("Join game request");
     let JoinGameRequest { game_id, user_id } = request;
+
+    // add a new connection for a new user
     {
         let _ = game_manager.write().await.connection_manager.add_connection(
             &game_id,
@@ -82,30 +85,48 @@ pub async fn join_game(
         );
     }
 
-    let mut game_manager_lock = game_manager.write().await;
+    // add user to a game
+    {
+        let mut game_manager_lock = game_manager.write().await;
 
-    let game_result = game_manager_lock.get_game_by_id(&game_id).await;
-    let mut game = match game_result {
-        Ok(game) => game,
-        Err(_) => {
-            return Response::RequestFailedResponse {
-                message: "Could not join game".to_string(),
-            }.into_response();
-        },
-    };
+        let game_result = game_manager_lock.get_mutable_game_by_id(&game_id).await;
+        let mut game = match game_result {
+            Ok(game) => game,
+            Err(_) => {
+                return Response::RequestFailedResponse {
+                    message: "Could not join game".to_string(),
+                }.into_response();
+            },
+        };
 
-    if game.get_users().0.unwrap() != user_id && game.get_users().1.is_none() {
-        game.set_user(None, Some(user_id.clone()));
+        if game.get_users().0.unwrap() != user_id && game.get_users().1.is_none() {
+            game.set_user(None, Some(user_id.clone()));
+        }
     }
 
-    match game.get_users() {
-        (Some(_), _) | (_, Some(_)) => Response::JoinGameResponse {
-            game_id,
-            message: "Joined game".to_string()
-        }.into_response(),
-        (_, None) => Response::RequestFailedResponse {
-            message: "Could not join game".to_string(),
-        }.into_response(),
+    // update game in the database
+    {
+        let game_manager_lock = game_manager.read().await;
+        let game = game_manager_lock.get_game_by_id(&game_id).await;
+        match game {
+            Ok(game) => {
+                let _ = game_manager_lock.game_repository.update_game_by_id(game).await;
+                match game.get_users() {
+                    (Some(_), _) | (_, Some(_)) => {
+                        Response::JoinGameResponse {
+                            game_id,
+                            message: "Joined game".to_string()
+                        }.into_response()
+                    },
+                    (_, None) => Response::RequestFailedResponse {
+                        message: "Could not join game".to_string(),
+                    }.into_response(),
+                }
+            },
+            Err(_) => Response::RequestFailedResponse {
+                message: "Could not update game by id".to_string(),
+            }.into_response(),
+        }
     }
 }
 

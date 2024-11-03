@@ -12,6 +12,7 @@ mod event_service;
 mod game_manager;
 mod websocket_server_new;
 mod connection_manager;
+mod game_end_condition;
 
 use chess_engine::board::Board;
 use std::io::{self, Write};

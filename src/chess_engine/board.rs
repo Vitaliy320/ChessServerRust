@@ -10,10 +10,17 @@ pub enum Color {
 }
 
 #[derive(Debug, Clone)]
+enum ActiveColor {
+    White,
+    Black,
+}
+
+#[derive(Debug, Clone)]
 pub struct Board {
     id: Option<i32>,
+    fen: String,
     pieces: HashMap<String, Option<PieceEnum>>,
-    active_color: char,
+    active_color: ActiveColor,
     castle_options: String,
     en_passant_square: String,
     //todo: possibly replace  half_move_clock and full_move_number with 0
@@ -50,7 +57,7 @@ impl Board {
     //     board
     // }
 
-    pub fn create_board_from_fen(
+    pub fn new_from_fen(
         columns: String,
         n_of_columns: u32,
         rows: String,
@@ -60,12 +67,13 @@ impl Board {
         //todo: on_board_created() -> add board to db
         let mut board = Board {
             id: None,
+            fen: fen.clone(),
             pieces: HashMap::new(),
             number_of_columns: n_of_columns,
             number_of_rows: n_of_rows,
             columns,
             rows,
-            active_color: 'w',
+            active_color: ActiveColor::White,
             castle_options: "".to_string(),
             en_passant_square: "".to_string(),
             half_move_clock: None,
@@ -77,8 +85,9 @@ impl Board {
         board
     }
 
-    pub fn create_board_from_db(
+    pub fn new_from_db(
         id: i32,
+        fen: String,
         pieces: HashMap<String, Option<PieceEnum>>,
         active_color: char,
         castle_options: String,
@@ -91,10 +100,15 @@ impl Board {
         rows: String,
     ) -> Board {
         //todo: on_board_created() -> add board to db
+        let active_color_enum = match active_color {
+            'b' => ActiveColor::Black,
+            _ => ActiveColor::White,
+        };
         let mut board = Board {
             id: Some(id),
+            fen,
             pieces,
-            active_color,
+            active_color: active_color_enum,
             castle_options,
             en_passant_square,
             half_move_clock: Some(half_move_clock),
@@ -118,6 +132,10 @@ impl Board {
         board
     }
 
+    // pub fn board_to_fen(board: Board) -> String {
+    //
+    // }
+
     pub fn create_pieces_from_fen(&mut self, fen: String) {
         let split_fen: Vec<String>        = fen.split(' ').map(|s| String::from(s)).collect();
         let board_fen             = &split_fen[0];
@@ -127,7 +145,10 @@ impl Board {
         let half_move_fen         = &split_fen[4];
         let full_move_number_fen  = &split_fen[5];
 
-        self.active_color = color_fen.chars().nth(0).unwrap();
+        self.active_color = match color_fen.chars().nth(0).unwrap() {
+            'b' => ActiveColor::Black,
+            _ => ActiveColor::White,
+        };
         self.castle_options = castle_fen.clone();
         self.en_passant_square = en_passant_fen.clone();
         self.half_move_clock = half_move_fen.parse().ok();
@@ -175,29 +196,12 @@ impl Board {
     }
 
 
-    //todo: remove create_squares()
-    fn create_squares(&mut self) {
-        // let mut coordinates_string: String;
-        // let mut column: char;
-        // let mut row: char;
-        // let mut squares: HashMap<String, Square> = HashMap::new();
-        //
-        // for i in 0..self.number_of_columns {
-        //     column = self.columns.chars().nth(i as usize).unwrap_or('\0');
-        //     for j in 0..self.number_of_rows {
-        //         row = self.rows.chars().nth(j as usize).unwrap_or('\0');
-        //
-        //         coordinates_string = column.to_string() + &row.to_string();
-        //         squares.insert(coordinates_string, Square::new((column, row)));
-        //         // println!("Coordinates: {:?}", squares.get("a1").unwrap().borrow_mut().get_coordinates())
-        //     }
-        // }
-
-        // self.squares = squares;
-    }
-
     pub fn set_id(&mut self, id: i32) {
         self.id = Some(id);
+    }
+
+    pub fn get_fen(&self) -> String {
+        self.fen.clone()
     }
 
     pub fn get_pieces_dict(&self) -> HashMap<String, Option<PieceEnum>> {
@@ -227,8 +231,15 @@ impl Board {
         pieces
     }
 
-    pub fn get_active_color(&self) -> char {
+    pub fn get_active_color(&self) -> ActiveColor {
         self.active_color.clone()
+    }
+
+    pub fn get_active_color_string(&self) -> String {
+        match self.active_color {
+            ActiveColor::White => "w".to_string(),
+            ActiveColor::Black => "b".to_string(),
+        }
     }
 
     pub fn get_castle_options(&self) -> String {
@@ -323,7 +334,7 @@ impl Board {
         let mut rows_vector: Vec<String> = Vec::new();
 
         let mut board_string: String = String::new();
-        let mut rows_str = "                  \n                  ".to_string();
+
         rows_vector.push("                  ".to_string());
         rows_vector.push("                  ".to_string());
 

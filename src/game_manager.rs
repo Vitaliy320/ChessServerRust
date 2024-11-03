@@ -46,7 +46,14 @@ impl GameManager {
         ids
     }
 
-    pub async fn get_game_by_id(&mut self, game_id: &Uuid) -> Result<&mut Game, String> {
+    pub async fn get_game_by_id(&self, game_id: &Uuid) -> Result<&Game, String> {
+        match self.games.get(game_id) {
+            Some(game) => Ok(game),
+            _ => Err("Could not find a game".to_string()),
+        }
+    }
+
+    pub async fn get_mutable_game_by_id(&mut self, game_id: &Uuid) -> Result<&mut Game, String> {
         match self.games.get_mut(game_id) {
             Some(game) => Ok(game),
             _ => Err("Could not find a game".to_string()),
