@@ -16,7 +16,9 @@ use uuid::Uuid;
 use crate::game_repository::GameRepository;
 use crate::connection_manager::ConnectionManager;
 use crate::game::Game;
+use crate::game_end_condition::GameEndCondition;
 use crate::game_manager::GameManager;
+use crate::game_status::GameStatus;
 use crate::response::Response;
 
 
@@ -33,6 +35,8 @@ pub enum Event {
         columns:String,
         rows: String,
         board: HashMap<String, (String, Vec<String>)>,
+        game_status: GameStatus,
+        game_end_condition: GameEndCondition,
     },
     Default {},
 }
@@ -41,8 +45,8 @@ pub enum Event {
 impl From<Response> for Event {
     fn from(value: Response) -> Self {
         match value {
-            Response::MakeMoveResponse { game_id, message, columns, rows, board} =>
-                Event::MoveMade { game_id, message, columns, rows, board },
+            Response::MakeMoveResponse { game_id, message, columns, rows, board, game_status, game_end_condition} =>
+                Event::MoveMade { game_id, message, columns, rows, board, game_status, game_end_condition },
             _ => Event::Default {},
         }
     }
@@ -74,8 +78,8 @@ impl EventService {
                 self.send_authorized_message(game_id.clone(), user_id.clone(), connection_id.clone(), message.clone()).await;
             },
 
-            Response::MakeMoveResponse { game_id, message, columns, rows, board } => {
-                self.send_move_made_message(game_id.clone(), message.clone(), columns.clone(), rows.clone(), board.clone()).await
+            Response::MakeMoveResponse { game_id, message, columns, rows, board, game_status, game_end_condition } => {
+                self.send_move_made_message(game_id.clone(), message.clone(), columns.clone(), rows.clone(), board.clone(), game_status.clone(), game_end_condition.clone()).await
             },
             _ => {},
         }
@@ -133,6 +137,8 @@ impl EventService {
         columns: String,
         rows: String,
         board: HashMap<String, (String, Vec<String>)>,
+        game_status: GameStatus,
+        game_end_condition: GameEndCondition,
     ) {
         let game_manager_lock = self.game_manager.read().await;
         match game_manager_lock.connection_manager.game_id_user_ids.get(&game_id) {
@@ -155,7 +161,7 @@ impl EventService {
                         _ => {},
                     }
                 }
-                let response = Response::MakeMoveResponse { game_id, message, columns, rows, board };
+                let response = Response::MakeMoveResponse { game_id, message, columns, rows, board, game_status, game_end_condition };
                 // let response = serde_json::to_string(&response).unwrap();
                 for mut connection in connections {
                     let mut ws_connection = connection.lock().await;

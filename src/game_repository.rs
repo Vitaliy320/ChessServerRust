@@ -166,6 +166,7 @@ impl GameRepository {
                 white_id TEXT,
                 black_id TEXT,
                 status VARCHAR NOT NULL,
+                game_end_condition VARCHAR NOT NULL,
                 FOREIGN KEY (board_id) REFERENCES boards (id) ON DELETE CASCADE
                 );", &[]).await;
 
@@ -175,7 +176,7 @@ impl GameRepository {
                             Ok(board_id) => {
                                 let result = db_client.query_one("
                                 INSERT INTO games (id, board_id, user1_id, user2_id, white_id,
-                                black_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+                                black_id, status, game_end_condition) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
                                 &[
                                     &game.get_game_id(),
                                     &board_id,
@@ -184,6 +185,7 @@ impl GameRepository {
                                     &game.get_white_id(),
                                     &game.get_black_id(),
                                     &game.get_game_status(),
+                                    &game.get_game_end_condition(),
                                 ]).await;
 
                                 match result {
@@ -210,7 +212,7 @@ impl GameRepository {
             None => Err("Could not connect to the database".to_string()),
             Some(db_client) => {
                 let result = db_client.query_one("\
-                SELECT id, board_id, user1_id, user2_id, white_id, black_id, status
+                SELECT id, board_id, user1_id, user2_id, white_id, black_id, status, game_end_condition
                 FROM games WHERE id = $1", &[&id]).await;
 
                 match result {
@@ -227,6 +229,7 @@ impl GameRepository {
                                     row.get("white_id"),
                                     row.get("black_id"),
                                     row.get("status"),
+                                    row.get("game_end__condition"),
                                     board,
                                 );
                                 Ok(game)
@@ -246,6 +249,7 @@ impl GameRepository {
                 let e = db_client.execute("
                 CREATE TABLE IF NOT EXISTS boards (
                 id SERIAL PRIMARY KEY,
+                fen TEXT NOT NULL,
                 active_color CHAR(1) NOT NULL,
                 castle_options TEXT NOT NULL,
                 en_passant_square TEXT,
@@ -258,23 +262,25 @@ impl GameRepository {
                 );"
                 ,&[]).await;
 
-                let active_color =      board.get_active_color().to_string();
+                let fen =               board.get_fen();
+                let active_color =      board.get_active_color_string();
                 let castle_options =    board.get_castle_options();
                 let en_passant_square = board.get_en_passant_square();
                 let half_move_clock =     board.get_half_move_clock().unwrap();
                 let full_move_number =    board.get_full_move_number().unwrap();
-                let number_of_columns =  board.get_number_of_columns() as i32;
-                let number_of_rows =     board.get_number_of_rows() as i32;
+                let number_of_columns =   board.get_number_of_columns() as i32;
+                let number_of_rows =      board.get_number_of_rows() as i32;
                 let columns =           board.get_columns();
                 let rows =              board.get_rows();
 
                 let query = "
-                INSERT INTO boards (active_color, castle_options, en_passant_square, half_move_clock, full_move_number,
-                number_of_columns, number_of_rows, columns, rows) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                INSERT INTO boards (fen, active_color, castle_options, en_passant_square, half_move_clock, full_move_number,
+                number_of_columns, number_of_rows, columns, rows) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING id";
 
                 let result = db_client.query_one(query,
             &[
+                    &fen,
                     &active_color,
                     &castle_options,
                     &en_passant_square,
@@ -354,7 +360,7 @@ impl GameRepository {
             None => Err("Could not connect to the database".to_string()),
             Some(db_client) => {
                 let result = db_client.query_one("\
-                SELECT id, active_color, castle_options, en_passant_square,
+                SELECT id, fen, active_color, castle_options, en_passant_square,
                 half_move_clock, full_move_number, number_of_columns, number_of_rows, columns, rows
                 FROM boards WHERE id = $1", &[&id]).await;
 
@@ -369,8 +375,9 @@ impl GameRepository {
                         match pieces {
                             Err(e) => Err(e),
                             Ok(pieces) => Ok(
-                                Board::create_board_from_db(
+                                Board::new_from_db(
                                     row.get("id"),
+                                    row.get("fen"),
                                     pieces,
                                     active_color,
                                     row.get("castle_options"),
@@ -417,6 +424,30 @@ impl GameRepository {
                         }
                         Ok(pieces)
                     }
+                }
+            }
+        }
+    }
+
+    pub async fn update_game_by_id(&self, game: &Game) -> Result<(), String> {
+        match &self.db_client {
+            None => Err("Could not connect to the database".to_string()),
+            Some(db_client) => {
+                let game_id = game.get_game_id().to_string();
+                let row_updated = db_client.execute("\
+                UPDATE games SET user1_id = $1, user2_id = $2, white_id = $3, black_id = $4, status = $5, game_end_condition = $6 where id = $7
+                ", &[
+                    &game.get_user1_id(),
+                    &game.get_user2_id(),
+                    &game.get_white_id(),
+                    &game.get_black_id(),
+                    &game.get_game_status(),
+                    &game.get_game_end_condition(),
+                    &game.get_game_id(),
+                ]).await;
+                match row_updated {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err("Could not update game by id".to_string()),
                 }
             }
         }
