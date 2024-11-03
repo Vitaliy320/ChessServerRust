@@ -1,4 +1,6 @@
+use std::char::from_u32;
 use std::collections::HashMap;
+use std::fmt::format;
 use std::hash::Hash;
 use crate::chess_engine::piece::Piece;
 use crate::chess_engine::piece::PieceEnum;
@@ -13,6 +15,15 @@ pub enum Color {
 enum ActiveColor {
     White,
     Black,
+}
+
+impl ActiveColor {
+    pub fn to_char(&self) -> char {
+        match self {
+            ActiveColor::White => 'w',
+            ActiveColor::Black => 'b',
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -132,9 +143,38 @@ impl Board {
         board
     }
 
-    // pub fn board_to_fen(board: Board) -> String {
-    //
-    // }
+    pub fn board_to_fen(&self) -> String {
+        let mut board_fen = String::new();
+        for (row_index, row_coordinate) in self.rows.chars().rev().enumerate() {
+            let mut empty_cells_counter = 0;
+            for column_coordinate in self.columns.chars() {
+                let piece = self.pieces.get(&format!("{column_coordinate}{row_coordinate}")).unwrap();
+                match piece {
+                    Some(piece) => {
+                        if empty_cells_counter > 0 {
+                            board_fen.push(std::char::from_digit(empty_cells_counter, 10).unwrap());
+                        }
+                        empty_cells_counter = 0;
+                        board_fen.push_str(piece.get_symbol().as_str());
+                    },
+                    None => empty_cells_counter += 1,
+                }
+            }
+
+            if empty_cells_counter > 0 {
+                board_fen.push(std::char::from_digit(empty_cells_counter, 10).unwrap());
+            }
+
+            if row_index < self.rows.len() - 1 {
+                board_fen.push('/');
+            }
+        }
+
+        let half_move_clock = self.half_move_clock.unwrap_or_else(|| 0);
+        let full_move_number = self.full_move_number.unwrap_or_else(|| 0);
+        let fen = format!("{} {} {} {} {} {}", board_fen, self.active_color.to_char(), self.castle_options, self.en_passant_square, half_move_clock, full_move_number);
+        fen
+    }
 
     pub fn create_pieces_from_fen(&mut self, fen: String) {
         let split_fen: Vec<String>        = fen.split(' ').map(|s| String::from(s)).collect();
@@ -283,6 +323,7 @@ impl Board {
     }
 
     pub fn make_move(&mut self, move_from: String, move_to: String) {
+        // todo: update fen on every move
         if (move_from.len(), move_to.len()) != (2, 2) {
             return;
         }
@@ -297,6 +338,7 @@ impl Board {
             }
         }
 
+        let board_fen = self.board_to_fen();
         let s = format!("{}{}", move_from, move_to);
         println!("make_move_str square: {}", s);
     }
@@ -308,25 +350,6 @@ impl Board {
             }
         }
     }
-
-    // pub fn create_squares_vec(&mut self) {
-    //     let mut current_row: Vec<Square>;
-    //     let mut all_rows: Vec<Vec<Square>> = Vec::new();
-    //
-    //     for j in (0..self.number_of_rows).rev() {
-    //         current_row = Vec::new();
-    //         for i in 0..self.number_of_columns {
-    //             current_row.push(
-    //                 self.get_square_by_coordinates((
-    //                     self.columns.chars().nth(i as usize).unwrap(),
-    //                     self.rows.chars().nth(j as usize).unwrap()
-    //                 )).clone()
-    //             );
-    //         }
-    //         all_rows.push(current_row);
-    //     }
-    //     self.squares_vec = all_rows;
-    // }
 
     pub fn board_to_string(&mut self) -> String {
         //todo: refactor to get rid of self.squares_vec or remove
