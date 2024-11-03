@@ -34,9 +34,8 @@ pub struct Board {
     active_color: ActiveColor,
     castle_options: String,
     en_passant_square: String,
-    //todo: possibly replace  half_move_clock and full_move_number with 0
-    half_move_clock: Option<i32>,
-    full_move_number: Option<i32>,
+    half_move_clock: i32,
+    full_move_number: i32,
     number_of_columns: u32,
     number_of_rows: u32,
     columns: String,
@@ -44,30 +43,6 @@ pub struct Board {
 }
 
 impl Board {
-    // pub fn new(
-    //     columns: String,
-    //     n_of_columns: u32,
-    //     rows: String,
-    //     n_of_rows: u32,
-    // ) -> Board {
-    //     let mut board = Board {
-    //         number_of_columns: n_of_columns,
-    //         number_of_rows: n_of_rows,
-    //         columns,
-    //         rows,
-    //         squares: HashMap::new(),
-    //         active_color: 'w',
-    //         castle_options: "".to_string(),
-    //         en_passant_square: "".to_string(),
-    //         half_move_clock: None,
-    //         full_move_number: None,
-    //     };
-    //     board.create_squares();
-    //     board.board_from_fen(fen);
-    //     board.calculate_possible_moves();
-    //     board
-    // }
-
     pub fn new_from_fen(
         columns: String,
         n_of_columns: u32,
@@ -75,7 +50,6 @@ impl Board {
         n_of_rows: u32,
         fen: String,
     ) -> Self {
-        //todo: on_board_created() -> add board to db
         let mut board = Board {
             id: None,
             fen: fen.clone(),
@@ -87,8 +61,8 @@ impl Board {
             active_color: ActiveColor::White,
             castle_options: "".to_string(),
             en_passant_square: "".to_string(),
-            half_move_clock: None,
-            full_move_number: None,
+            half_move_clock: 0,
+            full_move_number: 0,
         };
         board.create_pieces_from_fen(fen);
         // board.pieces = board.create_pieces();
@@ -110,7 +84,6 @@ impl Board {
         columns: String,
         rows: String,
     ) -> Board {
-        //todo: on_board_created() -> add board to db
         let active_color_enum = match active_color {
             'b' => ActiveColor::Black,
             _ => ActiveColor::White,
@@ -122,8 +95,8 @@ impl Board {
             active_color: active_color_enum,
             castle_options,
             en_passant_square,
-            half_move_clock: Some(half_move_clock),
-            full_move_number: Some(full_move_number),
+            half_move_clock,
+            full_move_number,
             number_of_columns: number_of_columns as u32,
             number_of_rows: number_of_rows as u32,
             columns,
@@ -170,9 +143,7 @@ impl Board {
             }
         }
 
-        let half_move_clock = self.half_move_clock.unwrap_or_else(|| 0);
-        let full_move_number = self.full_move_number.unwrap_or_else(|| 0);
-        let fen = format!("{} {} {} {} {} {}", board_fen, self.active_color.to_char(), self.castle_options, self.en_passant_square, half_move_clock, full_move_number);
+        let fen = format!("{} {} {} {} {} {}", board_fen, self.active_color.to_char(), self.castle_options, self.en_passant_square, self.half_move_clock, self.full_move_number);
         fen
     }
 
@@ -191,8 +162,8 @@ impl Board {
         };
         self.castle_options = castle_fen.clone();
         self.en_passant_square = en_passant_fen.clone();
-        self.half_move_clock = half_move_fen.parse().ok();
-        self.full_move_number = full_move_number_fen.parse().ok();
+        self.half_move_clock = half_move_fen.parse().unwrap();
+        self.full_move_number = full_move_number_fen.parse().unwrap();
 
         let mut board_rows: Vec<String> = board_fen.split('/')
             .map(|s| String::from(s)).collect();
@@ -290,11 +261,11 @@ impl Board {
         self.en_passant_square.clone()
     }
 
-    pub fn get_half_move_clock(&self) -> Option<i32> {
+    pub fn get_half_move_clock(&self) -> i32 {
         self.half_move_clock.clone()
     }
 
-    pub fn get_full_move_number(&self) -> Option<i32> {
+    pub fn get_full_move_number(&self) -> i32 {
         self.full_move_number.clone()
     }
 
