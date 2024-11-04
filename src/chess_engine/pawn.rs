@@ -1,8 +1,9 @@
+use crate::chess_engine::coordinates::Coordinates;
 use crate::chess_engine::piece::Piece;
 
 #[derive(Debug, Clone)]
 pub struct Pawn {
-    coordinates: (char, char),
+    coordinates: Coordinates,
     color: char,
     possible_moves: Vec<String>,
     name: String,
@@ -10,7 +11,7 @@ pub struct Pawn {
 }
 
 impl Pawn {
-    pub fn new(color: char, coordinates: (char, char)) -> Pawn {
+    pub fn new(color: char, coordinates: Coordinates) -> Pawn {
         let symbol = if color.to_lowercase().next() == Some('w') {
             "P".to_string()
         } else {
@@ -21,7 +22,7 @@ impl Pawn {
             color,
             possible_moves: Vec::new(),
             name: String::from("Pawn"),
-            symbol
+            symbol,
         }
     }
 }
@@ -33,15 +34,30 @@ impl AsMut<dyn Piece + 'static> for Pawn {
 }
 
 impl Piece for Pawn {
-    fn get_possible_moves(&self) -> &Vec<String> {
-        &self.possible_moves
+    fn get_possible_moves(&self) -> Vec<String> {
+        self.possible_moves.clone()
     }
 
     fn set_possible_moves(&mut self, moves: Vec<String>) {
         self.possible_moves = moves
     }
 
-    fn calculate_possible_moves(&mut self) {
+    fn calculate_possible_moves(&mut self, active_color: char, rows: &String, columns: &String) {
+        let direction: i8 = if self.color == 'w' { 1 } else { -1 };
+
+        let next_square =
+        if (self.color == 'w' && self.coordinates.row_char == rows.chars().nth(1).unwrap()) ||
+            (self.color == 'b' && self.coordinates.row_char == rows.chars().rev().nth(1).unwrap()) {
+            Coordinates::new_from_int(
+                &self.coordinates.column, &(self.coordinates.row + 2 * direction)
+            )
+        } else {
+            Coordinates::new_from_int(
+                &self.coordinates.column, &(self.coordinates.row + direction)
+            )
+        };
+
+
         self.possible_moves = Vec::new()
     }
 
@@ -53,13 +69,11 @@ impl Piece for Pawn {
         self.color.clone()
     }
 
-    // fn as_mut(self: Box<Pawn>) -> Box<Pawn> {
-    //     self
-    // }
+    fn get_coordinates(&self) -> Coordinates { self.coordinates.clone() }
 
-    fn get_coordinates_string(&self) -> String { format!("{}{}", self.coordinates.0, self.coordinates.1) }
+    fn get_coordinates_string(&self) -> String { self.coordinates.get_coordinates_string() }
 
-    fn set_coordinates(&mut self, coordinates: (char, char)) {
+    fn set_coordinates(&mut self, coordinates: Coordinates) {
         self.coordinates = coordinates;
     }
 
@@ -67,8 +81,7 @@ impl Piece for Pawn {
         if coordinates.len() != 2 {
             return;
         }
-        self.coordinates = (coordinates.chars().nth(0).unwrap(),
-                            coordinates.chars().nth(1).unwrap());
+        self.coordinates = Coordinates::new_from_string(&coordinates).unwrap();
     }
 
     fn get_name(&self) -> String { self.name.clone() }

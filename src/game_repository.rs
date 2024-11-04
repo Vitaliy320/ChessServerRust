@@ -23,6 +23,7 @@ use crate::chess_engine::board::Board;
 
 use crate::chess_engine::piece::PieceEnum;
 use crate::user::User;
+use crate::chess_engine::coordinates::Coordinates;
 
 
 pub struct GameRepository {
@@ -396,7 +397,7 @@ impl GameRepository {
         }
     }
 
-    pub async fn get_pieces_by_board_id(&self, id: i32) -> Result<HashMap<String, Option<PieceEnum>>, String>{
+    pub async fn get_pieces_by_board_id(&self, id: i32) -> Result<HashMap<Coordinates, Option<PieceEnum>>, String>{
         match &self.db_client {
             None => Err("Could not connect to the database".to_string()),
             Some(db_client) => {
@@ -406,10 +407,10 @@ impl GameRepository {
                 match result {
                     Err(_) => Err("Could not get pieces".to_string()),
                     Ok(rows) => {
-                        let mut pieces: HashMap<String, Option<PieceEnum>> = HashMap::new();
+                        let mut pieces: HashMap<Coordinates, Option<PieceEnum>> = HashMap::new();
                         for row in rows {
                             let coordinates: String = row.get("coordinates");
-                            let coordinates = (coordinates.chars().nth(0).unwrap(), coordinates.chars().nth(1).unwrap());
+                            let coordinates = Coordinates::new_from_string(&coordinates).unwrap();
                             let color: String = row.get("color");
                             let color = color.chars().nth(0).unwrap();
 
@@ -417,10 +418,10 @@ impl GameRepository {
                             let symbol = symbol.chars().nth(0).unwrap();
 
                             let piece = PieceEnum::new(
-                                coordinates,
+                                coordinates.clone(),
                                 symbol,
                             );
-                            pieces.insert(piece.get_coordinates_string(), Some(piece));
+                            pieces.insert(coordinates, Some(piece));
                         }
                         Ok(pieces)
                     }

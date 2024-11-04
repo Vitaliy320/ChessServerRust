@@ -208,7 +208,7 @@ fn board_to_dict(board: &mut Board) -> HashMap<String, (String, Vec<String>)> {
             Some(p) => {
                 let piece_possible_coordinates = p.get_possible_moves();
                 let s = p.get_symbol();
-                dict.insert(coordinates.deref().to_string(), (p.get_symbol(), piece_possible_coordinates.clone()));
+                dict.insert(coordinates.get_coordinates_string(), (p.get_symbol(), piece_possible_coordinates));
             },
             _ => (),
         }
