@@ -1,8 +1,9 @@
+use crate::chess_engine::coordinates::Coordinates;
 use crate::chess_engine::piece::Piece;
 
 #[derive(Debug, Clone)]
 pub struct Bishop {
-    coordinates: (char, char),
+    coordinates: Coordinates,
     color: char,
     possible_moves: Vec<String>,
     name: String,
@@ -10,7 +11,7 @@ pub struct Bishop {
 }
 
 impl Bishop {
-    pub fn new(color: char, coordinates: (char, char)) -> Bishop {
+    pub fn new(color: char, coordinates: Coordinates) -> Bishop {
         let symbol = if color.to_lowercase().next() == Some('w') {
             "B".to_string()
         } else {
@@ -33,15 +34,15 @@ impl AsMut<dyn Piece + 'static> for Bishop {
 }
 
 impl Piece for Bishop {
-    fn get_possible_moves(&self) -> &Vec<String> {
-        &self.possible_moves
+    fn get_possible_moves(&self) -> Vec<String> {
+        self.possible_moves.clone()
     }
 
     fn set_possible_moves(&mut self, moves: Vec<String>) {
         self.possible_moves = moves
     }
 
-    fn calculate_possible_moves(&mut self) {
+    fn calculate_possible_moves(&mut self, active_color: char, rows: &String, columns: &String) {
         self.possible_moves = Vec::new()
     }
 
@@ -53,13 +54,11 @@ impl Piece for Bishop {
         self.color.clone()
     }
 
-    // fn as_mut(self: Box<Self>) -> Box<(dyn Piece)> {
-    //     self
-    // }
+    fn get_coordinates(&self) -> Coordinates { self.coordinates.clone() }
 
-    fn get_coordinates_string(&self) -> String { format!("{}{}", self.coordinates.0.clone(), self.coordinates.1.clone()) }
+    fn get_coordinates_string(&self) -> String { self.coordinates.get_coordinates_string() }
 
-    fn set_coordinates(&mut self, coordinates: (char, char)) {
+    fn set_coordinates(&mut self, coordinates: Coordinates) {
         self.coordinates = coordinates;
     }
 
@@ -67,8 +66,7 @@ impl Piece for Bishop {
         if coordinates.len() != 2 {
             return;
         }
-        self.coordinates = (coordinates.chars().nth(0).unwrap(),
-                            coordinates.chars().nth(1).unwrap());
+        self.coordinates = Coordinates::new_from_string(&coordinates).unwrap();
     }
 
     fn get_name(&self) -> String { self.name.clone() }

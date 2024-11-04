@@ -6,6 +6,7 @@ use crate::chess_engine::{
     queen::Queen,
     king::King,
 };
+use crate::chess_engine::coordinates::Coordinates;
 
 #[derive(Debug, Clone)]
 pub enum PieceEnum {
@@ -24,14 +25,14 @@ enum FunctionVariant<F, Fp, P> {
 
 
 pub trait Piece {
-    fn get_possible_moves(&self) -> &Vec<String>;
+    fn get_possible_moves(&self) -> Vec<String>;
     fn set_possible_moves(&mut self, moves: Vec<String>);
-    fn calculate_possible_moves(&mut self);
+    fn calculate_possible_moves(&mut self, active_color: char, rows: &String, columns: &String);
     fn get_symbol(&self) -> String;
     fn get_color(&self) -> char;
-    // fn as_mut(self: Box<Self>) -> Box<(dyn Piece)>;
+    fn get_coordinates(&self) -> Coordinates;
     fn get_coordinates_string(&self) -> String;
-    fn set_coordinates(&mut self, coordinates: (char, char));
+    fn set_coordinates(&mut self, coordinates: Coordinates);
     fn set_coordinates_string(&mut self, coordinates: String);
     fn get_name(&self) -> String;
     // fn as_mut(self: Box<Rook>) -> Box<Rook>;
@@ -97,7 +98,7 @@ where
 
 impl PieceEnum {
     pub fn new(
-        coordinates: (char, char),
+        coordinates: Coordinates,
         symbol: char,
     ) -> PieceEnum {
         
@@ -123,11 +124,10 @@ impl PieceEnum {
     pub fn get_possible_moves(&self) -> Vec<String> {
         let mut moves: Option<Vec<String>> = None;//Vec::new();
         dispatch_variant(self,
-                         FunctionVariant::<_, fn(&dyn Piece, ()), ()>::WithoutParams(
-                             |piece: &dyn Piece| {
-                                 moves = Some(piece.get_possible_moves().clone());
-                             }
-                         ));
+                         FunctionVariant::<_, fn(&dyn Piece, ()), (), >::WithoutParams(
+                             |piece: &dyn Piece|
+                            moves = Some(piece.get_possible_moves())
+        ));
 
         moves.unwrap_or_else(|| Vec::new())
     }
@@ -138,11 +138,14 @@ impl PieceEnum {
             piece.set_possible_moves(params), moves),)
     }
 
-    pub fn calculate_possible_moves(&mut self) {
-        dispatch_variant_mut(self,
-        FunctionVariant::<_, fn(&mut dyn Piece, ()), ()>::WithoutParams(
-            |piece: &mut dyn Piece| piece.calculate_possible_moves()
-        ));
+    pub fn calculate_possible_moves(&mut self, active_color: char, rows: &String, columns: &String) {
+        dispatch_variant_mut(
+            self,
+            FunctionVariant::<fn(&mut dyn Piece), _, (char, &String, &String)>::WithParams(
+                |piece: &mut dyn Piece, (color, rows_, columns_)|
+                    piece.calculate_possible_moves(color, rows_, columns_), (active_color, rows, columns)
+            ),
+        );
     }
     pub fn get_symbol(&self) -> String {
         let mut symbol: Option<String> = None;
@@ -161,6 +164,16 @@ impl PieceEnum {
         color.unwrap_or_else(|| ' ')
     }
 
+    pub fn get_coordinates(&self) -> Coordinates {
+        let mut coordinates: Option<Coordinates> = None;
+        dispatch_variant(
+            self,
+            FunctionVariant::<_, fn(&dyn Piece, ()), ()>::WithoutParams(
+                |piece: &dyn Piece| coordinates = Some(piece.get_coordinates())
+            )
+        );
+        coordinates.unwrap()
+    }
 
     pub fn get_coordinates_string(&self) -> String {
         let mut coordinates: Option<String> = None;
@@ -171,9 +184,9 @@ impl PieceEnum {
         coordinates.unwrap_or_else(|| String::from(""))
     }
 
-    pub fn set_coordinates(&mut self, coordinates: (char, char)) {
+    pub fn set_coordinates(&mut self, coordinates: Coordinates) {
         dispatch_variant_mut(self,
-        FunctionVariant::<fn(&mut dyn Piece), _, (char, char)>::WithParams(
+        FunctionVariant::<fn(&mut dyn Piece), _, Coordinates>::WithParams(
             |piece: &mut dyn Piece, params| piece.set_coordinates(params), coordinates
         ));
     }

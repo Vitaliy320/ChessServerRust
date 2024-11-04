@@ -1,9 +1,10 @@
 use std::char::from_u32;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::format;
 use std::hash::Hash;
 use crate::chess_engine::piece::Piece;
 use crate::chess_engine::piece::PieceEnum;
+use crate::chess_engine::coordinates::Coordinates;
 
 pub enum Color {
     White,
@@ -30,7 +31,7 @@ impl ActiveColor {
 pub struct Board {
     id: Option<i32>,
     fen: String,
-    pieces: HashMap<String, Option<PieceEnum>>,
+    pieces: HashMap<Coordinates, Option<PieceEnum>>,
     active_color: ActiveColor,
     castle_options: String,
     en_passant_square: String,
@@ -40,6 +41,8 @@ pub struct Board {
     number_of_rows: u32,
     columns: String,
     rows: String,
+    columns_set: HashSet<char>,
+    rows_set: HashSet<char>,
 }
 
 impl Board {
@@ -56,13 +59,15 @@ impl Board {
             pieces: HashMap::new(),
             number_of_columns: n_of_columns,
             number_of_rows: n_of_rows,
-            columns,
-            rows,
+            columns: columns.clone(),
+            rows: rows.clone(),
             active_color: ActiveColor::White,
             castle_options: "".to_string(),
             en_passant_square: "".to_string(),
             half_move_clock: 0,
             full_move_number: 0,
+            columns_set: HashSet::from_iter(columns.chars()),
+            rows_set: HashSet::from_iter(rows.chars()),
         };
         board.create_pieces_from_fen(fen);
         // board.pieces = board.create_pieces();
@@ -73,7 +78,7 @@ impl Board {
     pub fn new_from_db(
         id: i32,
         fen: String,
-        pieces: HashMap<String, Option<PieceEnum>>,
+        pieces: HashMap<Coordinates, Option<PieceEnum>>,
         active_color: char,
         castle_options: String,
         en_passant_square: String,
@@ -99,14 +104,15 @@ impl Board {
             full_move_number,
             number_of_columns: number_of_columns as u32,
             number_of_rows: number_of_rows as u32,
-            columns,
-            rows,
+            columns: columns.clone(),
+            rows: rows.clone(),
+            columns_set: HashSet::from_iter(columns.chars()),
+            rows_set: HashSet::from_iter(rows.chars()),
         };
 
-        let mut coordinates: String;
         for row in board.rows.chars() {
             for column in board.columns.chars() {
-                coordinates = format!("{}{}", column, row);
+                let coordinates = Coordinates::new_from_char(&column, &row);
                 if !board.pieces.contains_key(&coordinates) {
                     board.pieces.insert(coordinates, None);
                 }
@@ -118,10 +124,12 @@ impl Board {
 
     pub fn board_to_fen(&self) -> String {
         let mut board_fen = String::new();
+        let mut coordinates: Coordinates;
         for (row_index, row_coordinate) in self.rows.chars().rev().enumerate() {
             let mut empty_cells_counter = 0;
             for column_coordinate in self.columns.chars() {
-                let piece = self.pieces.get(&format!("{column_coordinate}{row_coordinate}")).unwrap();
+                coordinates = Coordinates::new_from_char(&column_coordinate, &row_coordinate);
+                let piece = self.pieces.get(&coordinates).unwrap();
                 match piece {
                     Some(piece) => {
                         if empty_cells_counter > 0 {
@@ -189,7 +197,7 @@ impl Board {
                     let n_iter = column_counter + cell_value.to_digit(10).unwrap_or(0) as i32;
                     for i in column_counter..n_iter {
                         column_coordinate = self.columns.chars().nth(i as usize).unwrap();
-                        let coordinates = format!("{}{}", column_coordinate, row_coordinate);
+                        let coordinates = Coordinates::new_from_char(&column_coordinate, &row_coordinate);
                         self.pieces.insert(coordinates, None);
                     }
                     column_counter += cell_value as i32 - '0' as i32;
@@ -197,8 +205,8 @@ impl Board {
                     column_coordinate = self.columns.chars()
                         .nth(column_counter as usize)
                         .unwrap();
-                    let coordinates = format!("{}{}", column_coordinate, row_coordinate);
-                    piece = PieceEnum::new((column_coordinate, row_coordinate), cell_value);
+                    let coordinates = Coordinates::new_from_char(&column_coordinate, &row_coordinate);
+                    piece = PieceEnum::new(coordinates.clone(), cell_value);
                     self.pieces.insert(coordinates, Some(piece));
                     column_counter += 1;
                 }
@@ -215,11 +223,11 @@ impl Board {
         self.fen.clone()
     }
 
-    pub fn get_pieces_dict(&self) -> HashMap<String, Option<PieceEnum>> {
+    pub fn get_pieces_dict(&self) -> HashMap<Coordinates, Option<PieceEnum>> {
         self.pieces.clone()
     }
 
-    pub fn get_mut_pieces_dict(&mut self) -> &mut HashMap<String, Option<PieceEnum>> {
+    pub fn get_mut_pieces_dict(&mut self) -> &mut HashMap<Coordinates, Option<PieceEnum>> {
         &mut self.pieces
     }
 
@@ -285,6 +293,33 @@ impl Board {
         self.rows.clone()
     }
 
+    pub fn make_move(&mut self, move_from: String, move_to: String) {
+        // todo: update fen on every move
+        if (move_from.len(), move_to.len()) != (2, 2)
+            || !self.columns_set.contains(&move_from.chars().nth(0).unwrap())
+            || !self.rows_set.contains(&move_from.chars().nth(1).unwrap())
+            || !self.columns_set.contains(&move_to.chars().nth(0).unwrap())
+            || !self.rows_set.contains(&move_to.chars().nth(1).unwrap()) {
+            return;
+        }
+
+        self.calculate_possible_moves();
+
+        let move_from = Coordinates::new_from_string(&move_from).unwrap();
+        let move_to = Coordinates::new_from_string(&move_to).unwrap();
+        if let Some(piece_option) = self.pieces.get_mut(&move_from) {
+            if let Some(mut piece) = piece_option.take() {
+                piece.set_coordinates(move_to.clone());
+                self.pieces.insert(move_to.clone(), Some(piece));
+                self.pieces.insert(move_from.clone(), None);
+            }
+        }
+
+        let board_fen = self.board_to_fen();
+        let s = format!("{}{}", move_from.get_coordinates_string(), move_to.get_coordinates_string());
+        println!("make_move_str square: {}", s);
+    }
+
     pub fn make_move_chars(&mut self, move_from: (char, char), move_to: (char, char)) {
         self.calculate_possible_moves();
 
@@ -293,31 +328,10 @@ impl Board {
         self.make_move(move_from, move_to);
     }
 
-    pub fn make_move(&mut self, move_from: String, move_to: String) {
-        // todo: update fen on every move
-        if (move_from.len(), move_to.len()) != (2, 2) {
-            return;
-        }
-
-        self.calculate_possible_moves();
-
-        if let Some(piece_option) = self.pieces.get_mut(&move_from) {
-            if let Some(mut piece) = piece_option.take() {
-                piece.set_coordinates_string(move_to.clone());
-                self.pieces.insert(move_to.clone(), Some(piece));
-                self.pieces.insert(move_from.clone(), None);
-            }
-        }
-
-        let board_fen = self.board_to_fen();
-        let s = format!("{}{}", move_from, move_to);
-        println!("make_move_str square: {}", s);
-    }
-
     fn calculate_possible_moves(&mut self) {
         for piece in self.pieces.values_mut() {
             if let Some(piece) = piece {
-                piece.calculate_possible_moves();
+                piece.calculate_possible_moves(self.active_color.to_char(), &self.rows, &self.columns);
             }
         }
     }
@@ -335,15 +349,13 @@ impl Board {
         for (row_index, row) in self.rows.chars().rev().enumerate() {
             board_string = format!("{}\n{} ", board_string, (self.number_of_rows - row_index as u32).to_string());
             for column in self.columns.chars() {
-                let coordinates = format!("{}{}", column, row);
+                let coordinates = Coordinates::new_from_char(&column, &row);
                 let a = self.pieces.get(&coordinates);
                 match self.pieces.get(&coordinates).unwrap() {
                     Some(piece) => board_string.push_str(format!("{} ", piece.get_symbol()).as_str()),
                     None => board_string += "  ",
                 }
             }
-
-            // board_string.push('\n');
         }
 
         board_string.push_str("\n  A B C D E F G H ");
