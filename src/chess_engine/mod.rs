@@ -8,3 +8,4 @@ pub mod queen;
 pub mod rook;
 pub mod square;
 pub mod coordinates;
+pub mod color;

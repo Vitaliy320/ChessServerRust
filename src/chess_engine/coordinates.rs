@@ -11,10 +11,36 @@ impl Coordinates {
         Coordinates {
             column: *column,
             row: *row,
+            column_char: ('a' as i8 + *column) as u8 as char,
+            row_char: char::from_digit((*row + 1) as u32, 10).unwrap(),
+        }
+    }
+
+    pub fn new_from_int_limited(column: &mut i8, row: &mut i8, n_columns: i32, n_rows: i32) -> Coordinates {
+        if (*column as i32) < 0 {
+            *column = 0;
+        }
+
+        if (*column as i32) >= n_columns {
+            *column = n_columns as i8 - 1;
+        }
+
+        if (*row as i32) < 0 {
+            *row = 0;
+        }
+
+        if (*row as i32) >= n_rows {
+            *row = n_rows as i8 - 1;
+        }
+
+        Coordinates {
+            column: *column,
+            row: *row,
             column_char: char::from_digit(*column as u32, 10).unwrap(),
             row_char: char::from_digit(*row as u32, 10).unwrap(),
         }
     }
+
     pub fn new_from_char(column: &char, row: &char) -> Coordinates {
         Coordinates::new_from_int(&(*column as i8 - 'a' as i8), &(*row as i8 - '1' as i8))
     }
@@ -39,6 +65,6 @@ impl Coordinates {
     }
 
     pub fn get_coordinates_string(&self) -> String {
-        format!("{}{}", self.column.to_string(), self.row.to_string())
+        format!("{}{}", self.column_char.to_string(), self.row_char.to_string())
     }
 }

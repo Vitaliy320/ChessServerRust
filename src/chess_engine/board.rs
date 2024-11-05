@@ -2,36 +2,18 @@ use std::char::from_u32;
 use std::collections::{HashMap, HashSet};
 use std::fmt::format;
 use std::hash::Hash;
+use std::sync::Arc;
 use crate::chess_engine::piece::Piece;
 use crate::chess_engine::piece::PieceEnum;
 use crate::chess_engine::coordinates::Coordinates;
-
-pub enum Color {
-    White,
-    Black,
-    Random,
-}
-
-#[derive(Debug, Clone)]
-enum ActiveColor {
-    White,
-    Black,
-}
-
-impl ActiveColor {
-    pub fn to_char(&self) -> char {
-        match self {
-            ActiveColor::White => 'w',
-            ActiveColor::Black => 'b',
-        }
-    }
-}
+use crate::chess_engine::color::ActiveColor;
 
 #[derive(Debug, Clone)]
 pub struct Board {
     id: Option<i32>,
     fen: String,
     pieces: HashMap<Coordinates, Option<PieceEnum>>,
+    possible_moves: HashMap<String, (String, Vec<String>)>,
     active_color: ActiveColor,
     castle_options: String,
     en_passant_square: String,
@@ -43,6 +25,10 @@ pub struct Board {
     rows: String,
     columns_set: HashSet<char>,
     rows_set: HashSet<char>,
+    bottom_left_square: Coordinates,
+    top_right_square: Coordinates,
+    w_king_position: Coordinates,
+    b_king_position: Coordinates,
 }
 
 impl Board {
@@ -57,6 +43,7 @@ impl Board {
             id: None,
             fen: fen.clone(),
             pieces: HashMap::new(),
+            possible_moves: HashMap::new(),
             number_of_columns: n_of_columns,
             number_of_rows: n_of_rows,
             columns: columns.clone(),
@@ -68,6 +55,16 @@ impl Board {
             full_move_number: 0,
             columns_set: HashSet::from_iter(columns.chars()),
             rows_set: HashSet::from_iter(rows.chars()),
+            bottom_left_square: Coordinates::new_from_char(
+                &(columns.chars().nth(0).unwrap()),
+                &(rows.chars().nth(0).unwrap())
+            ),
+            top_right_square: Coordinates::new_from_char(
+                &(columns.chars().rev().nth(0).unwrap()),
+                &(rows.chars().rev().nth(0).unwrap())
+            ),
+            w_king_position: Coordinates::new_from_char(&'e', &'1'),
+            b_king_position: Coordinates::new_from_char(&'e', &'8'),
         };
         board.create_pieces_from_fen(fen);
         // board.pieces = board.create_pieces();
@@ -97,6 +94,7 @@ impl Board {
             id: Some(id),
             fen,
             pieces,
+            possible_moves: HashMap::new(),
             active_color: active_color_enum,
             castle_options,
             en_passant_square,
@@ -108,6 +106,16 @@ impl Board {
             rows: rows.clone(),
             columns_set: HashSet::from_iter(columns.chars()),
             rows_set: HashSet::from_iter(rows.chars()),
+            bottom_left_square: Coordinates::new_from_char(
+                &(columns.chars().nth(0).unwrap()),
+                &(rows.chars().nth(0).unwrap())
+            ),
+            top_right_square: Coordinates::new_from_char(
+                &(columns.chars().rev().nth(0).unwrap()),
+                &(rows.chars().rev().nth(0).unwrap())
+            ),
+            w_king_position: Coordinates::new_from_char(&'e', &'1'),
+            b_king_position: Coordinates::new_from_char(&'e', &'8'),
         };
 
         for row in board.rows.chars() {
@@ -293,47 +301,75 @@ impl Board {
         self.rows.clone()
     }
 
-    pub fn make_move(&mut self, move_from: String, move_to: String) {
-        // todo: update fen on every move
+    pub fn get_columns_set(&self) -> &HashSet<char> {
+        &self.columns_set
+    }
+
+    pub fn get_rows_set(&self) -> &HashSet<char> {
+        &self.rows_set
+    }
+
+    pub fn make_move(
+        &mut self,
+        move_from: &Coordinates,
+        move_to: &Coordinates,
+        calculate_new_moves: bool,
+    ) -> bool {
+        // todo: update board in database
+        if let Some(piece_option) = self.pieces.get_mut(&move_from) {
+            match piece_option.take() {
+                Some(mut piece) => {
+                    if piece.get_color() != self.active_color.to_char() {
+                        return false;
+                    }
+                    if piece.get_symbol() == "K" && piece.get_color() == 'w' {
+                        self.w_king_position = move_to.clone();
+                    }
+
+                    if piece.get_symbol() == "k" && piece.get_color() == 'b' {
+                        self.w_king_position = move_to.clone();
+                    }
+
+                    piece.set_coordinates(&move_to);
+                    self.pieces.insert(move_to.clone(), Some(piece));
+                    self.pieces.insert(move_from.clone(), None);
+                },
+                _ => return false,
+            }
+        }
+
+        if calculate_new_moves {
+            self.active_color = self.active_color.next();
+            self.calculate_possible_moves();
+            let s = format!("{}{}", move_from.get_coordinates_string(), move_to.get_coordinates_string());
+            println!("make_move_str square: {}", s);
+        }
+        self.fen = self.board_to_fen();
+        true
+    }
+
+    pub fn make_move_string(&mut self, move_from: String, move_to: String) -> bool {
+
         if (move_from.len(), move_to.len()) != (2, 2)
             || !self.columns_set.contains(&move_from.chars().nth(0).unwrap())
             || !self.rows_set.contains(&move_from.chars().nth(1).unwrap())
             || !self.columns_set.contains(&move_to.chars().nth(0).unwrap())
             || !self.rows_set.contains(&move_to.chars().nth(1).unwrap()) {
-            return;
+            return false;
         }
-
-        self.calculate_possible_moves();
 
         let move_from = Coordinates::new_from_string(&move_from).unwrap();
         let move_to = Coordinates::new_from_string(&move_to).unwrap();
-        if let Some(piece_option) = self.pieces.get_mut(&move_from) {
-            if let Some(mut piece) = piece_option.take() {
-                piece.set_coordinates(move_to.clone());
-                self.pieces.insert(move_to.clone(), Some(piece));
-                self.pieces.insert(move_from.clone(), None);
-            }
-        }
 
-        let board_fen = self.board_to_fen();
-        let s = format!("{}{}", move_from.get_coordinates_string(), move_to.get_coordinates_string());
-        println!("make_move_str square: {}", s);
+        self.make_move(&move_from, &move_to, true)
     }
 
-    pub fn make_move_chars(&mut self, move_from: (char, char), move_to: (char, char)) {
-        self.calculate_possible_moves();
-
-        let move_from = format!("{}{}", move_from.0, move_from.1);
-        let move_to = format!("{}{}", move_to.0, move_to.1);
-        self.make_move(move_from, move_to);
-    }
-
-    fn calculate_possible_moves(&mut self) {
-        for piece in self.pieces.values_mut() {
-            if let Some(piece) = piece {
-                piece.calculate_possible_moves(self.active_color.to_char(), &self.rows, &self.columns);
-            }
-        }
+    pub fn make_move_chars(&mut self, move_from: (char, char), move_to: (char, char)) -> bool {
+        self.make_move(
+            &Coordinates::new_from_char(&move_from.0, &move_from.1),
+            &Coordinates::new_from_char(&move_to.0, &move_to.1),
+            true
+        )
     }
 
     pub fn board_to_string(&mut self) -> String {
@@ -361,6 +397,81 @@ impl Board {
         board_string.push_str("\n  A B C D E F G H ");
 
         board_string
+    }
+
+    fn calculate_possible_moves(&mut self) {
+        let board_clone = &self.clone();
+        for piece in self.pieces.values_mut() {
+            if let Some(piece) = piece {
+                self.possible_moves.insert(
+                    piece.get_coordinates_string(),
+                    (piece.get_symbol(), piece.calculate_possible_moves(board_clone))
+                );
+            }
+        }
+    }
+
+    pub fn square_is_valid(&self, coordinates: &Coordinates) -> bool {
+        if coordinates.column < self.bottom_left_square.column
+            || coordinates.row < self.bottom_left_square.row
+            || coordinates.column > self.top_right_square.column
+            || coordinates.row > self.top_right_square.row {
+            return false;
+        }
+        true
+    }
+
+    pub fn square_is_capturable(&self, coordinates: &Coordinates, color: &char) -> bool {
+        match self.pieces.get(&coordinates).unwrap() {
+            Some(p) => {
+                if !["k", "K"].contains(&p.get_symbol().as_str())
+                    && p.get_color() != *color {
+                    true;
+                }
+                false
+            },
+            _ => false,
+        }
+    }
+
+    pub fn square_is_free(&self, coordinates: &Coordinates) -> bool {
+        match self.pieces.get(&coordinates).unwrap() {
+            None => true,
+            _ => false,
+        }
+    }
+
+    pub fn king_in_check_after_move(&self, from_coordinates: &Coordinates, to_coordinates: &Coordinates) -> bool {
+        let king_color = self.get_active_color();
+        let mut board_after_move = self.clone();
+        let _ = board_after_move.make_move(&from_coordinates, &to_coordinates, false);
+        board_after_move.king_is_in_check(king_color)
+    }
+
+    pub fn king_is_in_check(&self, color: ActiveColor) -> bool {
+        let king_square = match color {
+            ActiveColor::White => self.w_king_position.clone(),
+            ActiveColor::Black => self.b_king_position.clone(),
+        };
+
+        self.square_is_attacked(king_square, color)
+    }
+
+    pub fn square_is_attacked(&self, coordinates: Coordinates, color: ActiveColor) -> bool {
+        let color = color.to_char();
+        for piece in self.pieces.values() {
+            match piece {
+                Some(piece) => {
+                    if piece.get_color() != color {
+                        if piece.get_possible_moves().contains(&coordinates.get_coordinates_string()) {
+                            return true;
+                        }
+                    }
+                },
+                _ => {},
+            }
+        }
+        false
     }
 }
 
