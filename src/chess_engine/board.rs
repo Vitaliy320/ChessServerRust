@@ -316,10 +316,25 @@ impl Board {
         calculate_new_moves: bool,
     ) -> bool {
         // todo: update board in database
+        {
+            if let Some(piece_option) = self.pieces.get(&move_from) {
+                match piece_option {
+                    Some(piece) => {
+                        let a = piece.get_possible_moves();
+                        if piece.get_color() != self.active_color.to_char()
+                            || !piece.get_possible_moves().contains(&move_to.get_coordinates_string()) {
+                            return false;
+                        }
+                    },
+                    _ => return false,
+                }
+            }
+        }
         if let Some(piece_option) = self.pieces.get_mut(&move_from) {
             match piece_option.take() {
                 Some(mut piece) => {
-                    if piece.get_color() != self.active_color.to_char() {
+                    if piece.get_color() != self.active_color.to_char()
+                        || !piece.get_possible_moves().contains(&move_to.get_coordinates_string()) {
                         return false;
                     }
                     if piece.get_symbol() == "K" && piece.get_color() == 'w' {
@@ -426,9 +441,9 @@ impl Board {
             Some(p) => {
                 if !["k", "K"].contains(&p.get_symbol().as_str())
                     && p.get_color() != *color {
-                    true;
+                    false;
                 }
-                false
+                true
             },
             _ => false,
         }

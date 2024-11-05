@@ -88,7 +88,7 @@ impl Piece for Pawn {
 
             if board.square_is_valid(&next_square)
                 && board.square_is_capturable(&next_square, &self.color)
-                && !board.king_in_check_after_move(&self.coordinates, &next_square){
+                && !board.king_in_check_after_move(&self.coordinates, &next_square) {
                 possible_moves.insert(next_square.get_coordinates_string());
             }
         }
