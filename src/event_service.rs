@@ -10,12 +10,7 @@ use tokio::sync::{Mutex, RwLock, broadcast};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_websockets::WebSocketStream;
 use uuid::Uuid;
-// use tokio_tungstenite::tungstenite::protocol::Message;
 
-
-use crate::game_repository::GameRepository;
-use crate::connection_manager::ConnectionManager;
-use crate::game::Game;
 use crate::game_end_condition::GameEndCondition;
 use crate::game_manager::GameManager;
 use crate::game_status::GameStatus;
@@ -53,13 +48,13 @@ impl From<Response> for Event {
 }
 
 
-pub struct EventService {
+pub struct EventService{
     sender: broadcast::Sender<Response>,
     game_manager: Arc<RwLock<GameManager>>,
 }
 
 
-impl EventService {
+impl EventService{
     // Create a new EventService with a specified buffer size
     pub fn new(buffer_size: usize, game_manager: Arc<RwLock<GameManager>>) -> Self {
         let (sender, _) = broadcast::channel(buffer_size);

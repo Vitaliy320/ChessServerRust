@@ -25,8 +25,6 @@ use crate::game::Game;
 use crate::event_service::EventService;
 use crate::server::SharedState;
 
-
-#[debug_handler]
 pub async fn get_games_from_dict(
     State(game_manager): State<Arc<RwLock<GameManager>>>,
 ) -> AxumResponse {
@@ -37,7 +35,6 @@ pub async fn get_games_from_dict(
 }
 
 
-#[debug_handler]
 pub async fn create_game(
     State(mut game_manager): State<Arc<RwLock<GameManager>>>,
     Json(request): Json<CreateGameRequest>,
@@ -67,7 +64,6 @@ pub async fn create_game(
 }
 
 
-#[debug_handler]
 pub async fn join_game(
     State(mut game_manager): State<Arc<RwLock<GameManager>>>,
     Json(request): Json<JoinGameRequest>

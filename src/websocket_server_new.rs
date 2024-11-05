@@ -21,8 +21,8 @@ use uuid::Uuid;
 use crate::event_service::{Event, EventService};
 use crate::request;
 use crate::response::Response;
-use crate::response::Response::RequestFailedResponse;
 use crate::Board;
+use crate::chess_engine::color::ActiveColor;
 use crate::game_end_condition::GameEndCondition;
 use crate::game_status::GameStatus;
 
@@ -150,6 +150,18 @@ async fn make_move(
     from: String,
     to: String
 ) -> Response {
+    let mut user_color: Option<ActiveColor> = None;
+    {
+        let g_m_guard = game_manager.read().await;
+        let game = g_m_guard.get_game_by_id(&game_id).await;
+        user_color = match game {
+            Ok(game) => game.color_by_user_id.get(&user_id).cloned(),
+            _ => return Response::RequestFailedResponse {
+                message: "Wrong game id".to_string()
+            },
+        };
+    }
+
     let response = match game_manager.write().await.get_mutable_game_by_id(&game_id).await {
         Err(_) => Response::MakeMoveResponse {
             game_id,
@@ -172,29 +184,46 @@ async fn make_move(
                     game_end_condition: game.get_game_end_condition(),
                 },
                 Some(board) => {
-                    // self.game.as_mut().unwrap().get_board().unwrap().make_move_str("e2".to_string(), "e4".to_string());
-                    board.make_move(from.clone(), to.clone());
-                    let result = "Made move: ".to_string()
-                        + from.clone().as_str()
-                        + " "
-                        + to.clone().as_str()
-                        + "\n"
-                        + board.board_to_string().as_str();
-                    println!("{}", result);
-                    Response::MakeMoveResponse {
-                        game_id,
-                        message: format!("Made move from {} to {}", from, to),
-                        columns: board.get_columns(),
-                        rows: board.get_rows(),
-                        board: board_to_dict(board),
-                        game_status: game.get_game_status(),
-                        game_end_condition: game.get_game_end_condition(),
+                    match user_color {
+                        Some(color) => {
+                            if !color.equals(board.get_active_color()){
+                                return Response::RequestFailedResponse {
+                                    message: "Wrong user id".to_string()
+                                };
+                            }
+                        },
+                        None => return Response::RequestFailedResponse {
+                            message: "Wrong user id".to_string()
+                        },
+                    }
+
+                    match board.make_move_string(from.clone(), to.clone()) {
+                        true => {
+                            let result = "Made move: ".to_string()
+                                + from.clone().as_str()
+                                + " "
+                                + to.clone().as_str()
+                                + "\n"
+                                + board.board_to_string().as_str();
+                            println!("{}", result);
+                            Response::MakeMoveResponse {
+                                game_id,
+                                message: format!("Made move from {} to {}", from, to),
+                                columns: board.get_columns(),
+                                rows: board.get_rows(),
+                                board: board_to_dict(board),
+                                game_status: game.get_game_status(),
+                                game_end_condition: game.get_game_end_condition(),
+                            }
+                        },
+                        _ => Response::RequestFailedResponse {
+                            message: "Could not make a move".to_string()
+                        }
                     }
                 }
             }
         },
     };
-
     event_service.read().await.publish(&response).await;
     response
 }

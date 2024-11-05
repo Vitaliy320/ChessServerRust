@@ -17,6 +17,7 @@ mod game_end_condition;
 use chess_engine::board::Board;
 use std::io::{self, Write};
 use tokio::net::TcpListener;
+use crate::chess_engine::coordinates::Coordinates;
 
 struct Foo;
 impl Foo {
@@ -44,6 +45,7 @@ async fn main() {
     // let mut foo = Foo{};
     // foo.foo().await;
 
-    let _ = server::run_server().await;
     // let _ = websocket_server_new::run_server().await;
+
+    let _ = server::run_server().await;
 }

@@ -1,9 +1,10 @@
-use std::sync::{Arc, RwLock};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::game_status::GameStatus;
 use crate::chess_engine::board::Board;
 use crate::game_end_condition::GameEndCondition;
+use crate::chess_engine::color::ActiveColor;
 
 #[derive(Clone, Debug)]
 pub struct Game {
@@ -13,6 +14,7 @@ pub struct Game {
     user2_id: Option<String>,
     white_id: Option<String>,
     black_id: Option<String>,
+    pub color_by_user_id: HashMap<String, ActiveColor>,
     status: GameStatus,
     game_end_condition: GameEndCondition,
     board: Option<Board>,
@@ -20,10 +22,20 @@ pub struct Game {
 
 impl Game {
     pub fn new(user_id: String, color: String) -> Game {
+        let mut color_by_user_id = HashMap::new();
         let (white_id, black_id) = match color.as_str() {
-            "white" => (From::from(user_id.clone()), None),
-            "black" => (None, From::from(user_id.clone())),
-            _ => (From::from(user_id.clone()), None),
+            "white" => {
+                color_by_user_id.insert(user_id.clone(), ActiveColor::White);
+                (Some(user_id.clone()), None)
+            },
+            "black" => {
+                color_by_user_id.insert(user_id.clone(), ActiveColor::Black);
+                (None, Some(user_id.clone()))
+            },
+            _ => {
+                color_by_user_id.insert(user_id.clone(), ActiveColor::White);
+                (Some(user_id.clone()), None)
+            },
         };
 
         let columns = "abcdefgh".to_string();
@@ -42,6 +54,7 @@ impl Game {
             user2_id: None,
             white_id,
             black_id,
+            color_by_user_id,
             status: GameStatus::AwaitingOpponent,
             game_end_condition: GameEndCondition::None,
             board_id: None,
@@ -66,7 +79,18 @@ impl Game {
         black_id: Option<String>,
         status: GameStatus,
         game_end_condition: GameEndCondition,
-        board: Board) -> Game {
+        board: Board
+    ) -> Game {
+        let mut color_by_user_id = HashMap::new();
+
+        if let Some(white_id) = &white_id {
+            color_by_user_id.insert(white_id.clone(), ActiveColor::White);
+        }
+
+        if let Some(black_id) = &black_id {
+            color_by_user_id.insert(black_id.clone(), ActiveColor::Black);
+        }
+
         Game {
             game_id,
             board_id: Some(board_id),
@@ -74,6 +98,7 @@ impl Game {
             user2_id,
             white_id,
             black_id,
+            color_by_user_id,
             board: Some(board),
             status,
             game_end_condition,
@@ -101,8 +126,14 @@ impl Game {
             Some(user_id) => {
                 self.user2_id = Some(user_id.clone());
                 match (&self.white_id, &self.black_id) {
-                    (None, _) => self.white_id = Some(user_id.clone()),
-                    (_, None) => self.black_id = Some(user_id.clone()),
+                    (None, _) => {
+                        self.color_by_user_id.insert(user_id.clone(), ActiveColor::White);
+                        self.white_id = Some(user_id.clone())
+                    },
+                    (_, None) => self.black_id = {
+                        self.color_by_user_id.insert(user_id.clone(), ActiveColor::Black);
+                        Some(user_id.clone())
+                    },
                     _ => (),
                 }
                 self.status = GameStatus::Ongoing;

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+use crate::chess_engine::board::Board;
 use crate::chess_engine::coordinates::Coordinates;
 use crate::chess_engine::piece::Piece;
 
@@ -42,23 +44,57 @@ impl Piece for Pawn {
         self.possible_moves = moves
     }
 
-    fn calculate_possible_moves(&mut self, active_color: char, rows: &String, columns: &String) {
+    fn calculate_possible_moves(&mut self, board: &Board) -> Vec<String> {
+        if self.color != board.get_active_color().to_char() {
+            self.possible_moves = Vec::new();
+            return Vec::new();
+        }
+
+        let mut possible_moves = HashSet::new();
+        let rows = board.get_rows();
         let direction: i8 = if self.color == 'w' { 1 } else { -1 };
 
-        let next_square =
+        // one square move
+        let next_square = Coordinates::new_from_int(
+            &self.coordinates.column, &(self.coordinates.row + direction)
+        );
+
+        if board.square_is_valid(&next_square)
+            && board.square_is_free(&next_square)
+            && !board.king_in_check_after_move(&self.coordinates, &next_square) {
+            possible_moves.insert(next_square.get_coordinates_string());
+        }
+
+        // two squares move from starting position
         if (self.color == 'w' && self.coordinates.row_char == rows.chars().nth(1).unwrap()) ||
             (self.color == 'b' && self.coordinates.row_char == rows.chars().rev().nth(1).unwrap()) {
-            Coordinates::new_from_int(
+            let next_square = Coordinates::new_from_int(
                 &self.coordinates.column, &(self.coordinates.row + 2 * direction)
-            )
-        } else {
-            Coordinates::new_from_int(
-                &self.coordinates.column, &(self.coordinates.row + direction)
-            )
-        };
+            );
+            if board.square_is_valid(&next_square)
+                && board.square_is_free(&next_square)
+                && !board.king_in_check_after_move(&self.coordinates, &next_square) {
+                possible_moves.insert(next_square.get_coordinates_string());
+            }
+        }
 
+        // capture move
+        let mut next_square: Coordinates;
+        for col_shift in [-1, 1].iter() {
+            next_square = Coordinates::new_from_int(
+                &(self.coordinates.column + col_shift),
+                &(self.coordinates.row + direction)
+            );
 
-        self.possible_moves = Vec::new()
+            if board.square_is_valid(&next_square)
+                && board.square_is_capturable(&next_square, &self.color)
+                && !board.king_in_check_after_move(&self.coordinates, &next_square){
+                possible_moves.insert(next_square.get_coordinates_string());
+            }
+        }
+
+        self.possible_moves = possible_moves.clone().into_iter().collect();
+        possible_moves.into_iter().collect()
     }
 
     fn get_symbol(&self) -> String {

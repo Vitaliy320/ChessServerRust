@@ -1,3 +1,4 @@
+use crate::chess_engine::board::Board;
 use crate::chess_engine::coordinates::Coordinates;
 use crate::chess_engine::piece::Piece;
 
@@ -42,8 +43,8 @@ impl Piece for Rook {
         self.possible_moves = moves
     }
 
-    fn calculate_possible_moves(&mut self, active_color: char, rows: &String, columns: &String) {
-        self.possible_moves = Vec::new()
+    fn calculate_possible_moves(&mut self, board: &Board) -> Vec<String> {
+        Vec::new()
     }
 
     fn get_symbol(&self) -> String {
