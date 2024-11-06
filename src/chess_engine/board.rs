@@ -449,6 +449,23 @@ impl Board {
         }
     }
 
+    pub fn square_contains_piece_of_same_color(&self, coordinates: &Coordinates, color: &char) -> bool {
+        match self.pieces.get(&coordinates) {
+            Some(res) => {
+                match res {
+                    Some(p) => {
+                    if p.get_color() == *color {
+                        return true
+                    }
+                    false
+                },
+                    _ => false,
+                }
+            },
+            _ => false,
+        }
+    }
+
     pub fn square_is_free(&self, coordinates: &Coordinates) -> bool {
         match self.pieces.get(&coordinates).unwrap() {
             None => true,
@@ -460,19 +477,19 @@ impl Board {
         let king_color = self.get_active_color();
         let mut board_after_move = self.clone();
         let _ = board_after_move.make_move(&from_coordinates, &to_coordinates, false);
-        board_after_move.king_is_in_check(king_color)
+        board_after_move.king_is_in_check(&king_color)
     }
 
-    pub fn king_is_in_check(&self, color: ActiveColor) -> bool {
+    pub fn king_is_in_check(&self, color: &ActiveColor) -> bool {
         let king_square = match color {
-            ActiveColor::White => self.w_king_position.clone(),
-            ActiveColor::Black => self.b_king_position.clone(),
+            ActiveColor::White => &self.w_king_position,
+            ActiveColor::Black => &self.b_king_position,
         };
 
         self.square_is_attacked(king_square, color)
     }
 
-    pub fn square_is_attacked(&self, coordinates: Coordinates, color: ActiveColor) -> bool {
+    pub fn square_is_attacked(&self, coordinates: &Coordinates, color: &ActiveColor) -> bool {
         let color = color.to_char();
         for piece in self.pieces.values() {
             match piece {
