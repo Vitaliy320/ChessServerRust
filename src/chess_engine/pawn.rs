@@ -93,8 +93,8 @@ impl Piece for Pawn {
             }
         }
 
-        self.possible_moves = possible_moves.clone().into_iter().collect();
-        possible_moves.into_iter().collect()
+        self.possible_moves = possible_moves.into_iter().collect();
+        self.possible_moves.clone()
     }
 
     fn get_symbol(&self) -> String {

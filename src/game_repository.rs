@@ -1,24 +1,11 @@
 use std::collections::HashMap;
-use std::ops::DerefMut;
 use uuid::Uuid;
-use tokio_postgres::{Client, NoTls, Error as PostgresError};
-use tokio::sync::Mutex as tokioMutex;
-use std::net::{TcpListener, TcpStream};
-use std::io::{Read, Write};
-// use std::env;
-use std::fmt::format;
-use std::sync::{Arc, Mutex};
+use tokio_postgres::{Client, NoTls};
 use diesel::RunQueryDsl;
-// use tokio_tungstenite::tungstenite::protocol::Role::Client;
 use crate::game::Game;
 use crate::game_status::GameStatus;
 use dotenv::dotenv;
-use config::Config;
 use postgres::types::ToSql;
-use futures_util::future::join_all;
-use futures_util::TryFutureExt;
-use serde_json::to_string;
-use tokio_tungstenite::tungstenite::client;
 use crate::chess_engine::board::Board;
 
 use crate::chess_engine::piece::PieceEnum;
@@ -66,30 +53,6 @@ impl GameRepository {
                 println!("Connected to db");
             },
             _ => println!("Could not connect to db"),
-        }
-
-        let names = ["Steve", "John", "Paul", "Eric", "Glenn"];
-
-        let users: Vec<User> = names
-            .iter()
-            .map(|name| {
-                User {
-                    user_id: "".to_string(),
-                    name: name.to_string(),
-                    email: format!("{}@gmail.com", name),
-                }
-            }).collect();
-
-        // let _ = self.add_users_batch_to_users(users).await;
-
-        let users = self.get_users().await;
-        match users {
-            Ok(users) => {
-                users.iter().for_each(|user| {
-                    println!("User id: {}, name: {}, email: {}", user.user_id, user.name, user.email);
-                });
-            },
-            _ => (),
         }
     }
 
