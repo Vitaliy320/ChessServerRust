@@ -2,8 +2,6 @@
 pub struct Coordinates {
     pub column: i8,
     pub row: i8,
-    pub column_char: char,
-    pub row_char: char,
 }
 
 impl Coordinates {
@@ -11,8 +9,6 @@ impl Coordinates {
         Coordinates {
             column: *column,
             row: *row,
-            column_char: ('a' as i8 + *column) as u8 as char,
-            row_char: char::from_digit((*row + 1) as u32, 10).unwrap(),
         }
     }
 
@@ -36,8 +32,6 @@ impl Coordinates {
         Coordinates {
             column: *column,
             row: *row,
-            column_char: char::from_digit(*column as u32, 10).unwrap(),
-            row_char: char::from_digit(*row as u32, 10).unwrap(),
         }
     }
 
@@ -55,16 +49,24 @@ impl Coordinates {
         }
     }
 
-    pub fn get_coordinates_int(&self) -> (i8, i8) {
+    pub fn to_int(&self) -> (i8, i8) {
         (self.column, self.row)
     }
 
-    pub fn get_coordinates_char(&self) -> (char, char) {
+    pub fn to_char(&self) -> (char, char) {
         (char::from_digit(self.column as u32, 10).unwrap(),
          char::from_digit(self.row as u32, 10).unwrap())
     }
 
-    pub fn get_coordinates_string(&self) -> String {
-        format!("{}{}", self.column_char.to_string(), self.row_char.to_string())
+    pub fn to_string(&self) -> String {
+        format!("{}{}", self.column_char().to_string(), self.row_char().to_string())
+    }
+
+    pub fn column_char(&self) -> char {
+        ('a' as i8 + self.column) as u8 as char
+    }
+
+    pub fn row_char(&self) -> char {
+        char::from_digit((self.row + 1) as u32, 10).unwrap()
     }
 }

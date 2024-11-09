@@ -44,7 +44,7 @@ impl Piece for Pawn {
         self.possible_moves = moves
     }
 
-    fn calculate_possible_moves(&mut self, board: &Board) -> Vec<String> {
+    fn calculate_possible_moves(&mut self, board: &Board, calculate_check_moves: &bool) -> Vec<String> {
         if self.color != board.get_active_color().to_char() {
             self.possible_moves = Vec::new();
             return Vec::new();
@@ -61,20 +61,20 @@ impl Piece for Pawn {
 
         if board.square_is_valid(&next_square)
             && board.square_is_free(&next_square)
-            && !board.king_in_check_after_move(&self.coordinates, &next_square) {
-            possible_moves.insert(next_square.get_coordinates_string());
+            && !board.king_in_check_after_move(&self.coordinates, &next_square, calculate_check_moves) {
+            possible_moves.insert(next_square.to_string());
         }
 
         // two squares move from starting position
-        if (self.color == 'w' && self.coordinates.row_char == rows.chars().nth(1).unwrap()) ||
-            (self.color == 'b' && self.coordinates.row_char == rows.chars().rev().nth(1).unwrap()) {
+        if (self.color == 'w' && self.coordinates.row_char() == rows.chars().nth(1).unwrap()) ||
+            (self.color == 'b' && self.coordinates.row_char() == rows.chars().rev().nth(1).unwrap()) {
             let next_square = Coordinates::new_from_int(
                 &self.coordinates.column, &(self.coordinates.row + 2 * direction)
             );
             if board.square_is_valid(&next_square)
                 && board.square_is_free(&next_square)
-                && !board.king_in_check_after_move(&self.coordinates, &next_square) {
-                possible_moves.insert(next_square.get_coordinates_string());
+                && !board.king_in_check_after_move(&self.coordinates, &next_square, &true) {
+                possible_moves.insert(next_square.to_string());
             }
         }
 
@@ -88,8 +88,8 @@ impl Piece for Pawn {
 
             if board.square_is_valid(&next_square)
                 && board.square_is_capturable(&next_square, &self.color)
-                && !board.king_in_check_after_move(&self.coordinates, &next_square) {
-                possible_moves.insert(next_square.get_coordinates_string());
+                && !board.king_in_check_after_move(&self.coordinates, &next_square, &true) {
+                possible_moves.insert(next_square.to_string());
             }
         }
 
@@ -107,7 +107,7 @@ impl Piece for Pawn {
 
     fn get_coordinates(&self) -> Coordinates { self.coordinates.clone() }
 
-    fn get_coordinates_string(&self) -> String { self.coordinates.get_coordinates_string() }
+    fn get_coordinates_string(&self) -> String { self.coordinates.to_string() }
 
     fn set_coordinates(&mut self, coordinates: Coordinates) {
         self.coordinates = coordinates;

@@ -44,7 +44,7 @@ impl Piece for Bishop {
         self.possible_moves = moves
     }
 
-    fn calculate_possible_moves(&mut self, board: &Board) -> Vec<String> {
+    fn calculate_possible_moves(&mut self, board: &Board, calculate_check_moves: &bool) -> Vec<String> {
         if self.color != board.get_active_color().to_char() {
             self.possible_moves = Vec::new();
             return self.get_possible_moves();
@@ -70,11 +70,11 @@ impl Piece for Bishop {
                 }
 
                 if board.square_is_valid(&next_square)
-                    && !board.king_in_check_after_move(&self.coordinates, &next_square) {
+                    && !board.king_in_check_after_move(&self.coordinates, &next_square, calculate_check_moves) {
                     if board.square_is_free(&next_square) {
-                        possible_moves.insert(next_square.get_coordinates_string());
+                        possible_moves.insert(next_square.to_string());
                     } else if board.square_is_capturable(&next_square, &self.get_color()) {
-                        possible_moves.insert(next_square.get_coordinates_string());
+                        possible_moves.insert(next_square.to_string());
                         break
                     }
                 }
@@ -95,7 +95,7 @@ impl Piece for Bishop {
 
     fn get_coordinates(&self) -> Coordinates { self.coordinates.clone() }
 
-    fn get_coordinates_string(&self) -> String { self.coordinates.get_coordinates_string() }
+    fn get_coordinates_string(&self) -> String { self.coordinates.to_string() }
 
     fn set_coordinates(&mut self, coordinates: Coordinates) {
         self.coordinates = coordinates;
