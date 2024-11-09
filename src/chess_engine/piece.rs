@@ -28,7 +28,7 @@ enum FunctionVariant<F, Fp, P> {
 pub trait Piece {
     fn get_possible_moves(&self) -> Vec<String>;
     fn set_possible_moves(&mut self, moves: Vec<String>);
-    fn calculate_possible_moves(&mut self, board: &Board) -> Vec<String>;
+    fn calculate_possible_moves(&mut self, board: &Board, calculate_check_moves: &bool) -> Vec<String>;
     fn get_symbol(&self) -> String;
     fn get_color(&self) -> char;
     fn get_coordinates(&self) -> Coordinates;
@@ -139,13 +139,13 @@ impl PieceEnum {
             piece.set_possible_moves(params), moves),)
     }
 
-    pub fn calculate_possible_moves(&mut self, board: &Board) -> Vec<String> {
+    pub fn calculate_possible_moves(&mut self, board: &Board, calculate_check_moves: &bool) -> Vec<String> {
         let mut possible_moves: Vec<String> = Vec::new();
         dispatch_variant_mut(
             self,
-            FunctionVariant::<fn(&mut dyn Piece), _, &Board>::WithParams(
-                |piece: &mut dyn Piece, board_|
-                    possible_moves = piece.calculate_possible_moves(board_), (board)
+            FunctionVariant::<fn(&mut dyn Piece), _, (&Board, &bool)>::WithParams(
+                |piece: &mut dyn Piece, (board_, calculate_check)|
+                    possible_moves = piece.calculate_possible_moves(board_, calculate_check), (board, calculate_check_moves)
             ),
         );
         possible_moves
