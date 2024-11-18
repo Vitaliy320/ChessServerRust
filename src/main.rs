@@ -18,6 +18,7 @@ use chess_engine::board::Board;
 use std::io::{self, Write};
 use tokio::net::TcpListener;
 use crate::chess_engine::coordinates::Coordinates;
+use dotenv::dotenv;
 
 struct Foo;
 impl Foo {
@@ -42,6 +43,7 @@ impl Foo {
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
     // let mut foo = Foo{};
     // foo.foo().await;
 

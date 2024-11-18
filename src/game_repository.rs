@@ -4,7 +4,7 @@ use tokio_postgres::{Client, NoTls};
 use diesel::RunQueryDsl;
 use crate::game::Game;
 use crate::game_status::GameStatus;
-use dotenv::dotenv;
+
 use postgres::types::ToSql;
 use crate::chess_engine::board::Board;
 
@@ -20,7 +20,6 @@ pub struct GameRepository {
 
 impl GameRepository {
     pub fn new() -> Self {
-        dotenv().ok();
         GameRepository {
             db_client: None,
             games_dict: HashMap::new(),
@@ -34,7 +33,8 @@ impl GameRepository {
                 println!("DB url: {}", &url);
                 url
             }
-            _ => {
+            Err(e) => {
+                println!("{}", e.to_string());
                 println!("Fail");
                 "".to_string()
             },
@@ -52,7 +52,10 @@ impl GameRepository {
                 self.db_client = Some(client);
                 println!("Connected to db");
             },
-            _ => println!("Could not connect to db"),
+            Err(e) => {
+                println!("{}", e.to_string());
+                println!("Could not connect to db")
+            },
         }
     }
 
@@ -365,7 +368,7 @@ impl GameRepository {
             None => Err("Could not connect to the database".to_string()),
             Some(db_client) => {
                 let result = db_client.query("\
-                SELECT id, board_id, coordinates, color, name, symbol
+                SELECT id, board_id, coordinates, color, name, symbolgit remote -v
                 from pieces where board_id = $1", &[&id]).await;
                 match result {
                     Err(_) => Err("Could not get pieces".to_string()),
