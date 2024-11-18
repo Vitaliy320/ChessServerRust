@@ -1,19 +1,12 @@
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use uuid::Uuid;
-use tokio_postgres::{Client, NoTls, Error as PostgresError};
-use tokio::sync::Mutex as tokioMutex;
-use std::net::{TcpListener, TcpStream};
-use std::io::{Read, Write};
-// use std::env;
-use std::fmt::format;
-use std::sync::{Arc, Mutex};
+use tokio_postgres::{Client, NoTls};
+
 use diesel::RunQueryDsl;
-// use tokio_tungstenite::tungstenite::protocol::Role::Client;
 use crate::game::Game;
 use crate::game_status::GameStatus;
-use dotenv::dotenv;
-use config::Config;
+
 use postgres::types::ToSql;
 use futures_util::future::join_all;
 use futures_util::TryFutureExt;
@@ -33,7 +26,6 @@ pub struct GameRepository {
 
 impl GameRepository {
     pub fn new() -> Self {
-        dotenv().ok();
         GameRepository {
             db_client: None,
             games_dict: HashMap::new(),
@@ -47,7 +39,8 @@ impl GameRepository {
                 println!("DB url: {}", &url);
                 url
             }
-            _ => {
+            Err(e) => {
+                println!("{}", e.to_string());
                 println!("Fail");
                 "".to_string()
             },
@@ -65,7 +58,10 @@ impl GameRepository {
                 self.db_client = Some(client);
                 println!("Connected to db");
             },
-            _ => println!("Could not connect to db"),
+            Err(e) => {
+                println!("{}", e.to_string());
+                println!("Could not connect to db")
+            },
         }
 
         let names = ["Steve", "John", "Paul", "Eric", "Glenn"];
