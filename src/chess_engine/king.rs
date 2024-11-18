@@ -1,6 +1,12 @@
+use std::collections::HashSet;
 use crate::chess_engine::board::Board;
 use crate::chess_engine::coordinates::Coordinates;
 use crate::chess_engine::piece::Piece;
+
+const KING_DIRECTIONS: [(i8, i8); 8] = [
+    (0, 1), (1, 0), (0, -1), (-1, 0),
+    (1, 1), (-1, -1), (-1, 1), (1, -1)
+];
 
 #[derive(Debug, Clone)]
 pub struct King {
@@ -9,6 +15,7 @@ pub struct King {
     possible_moves: Vec<String>,
     name: String,
     symbol: String,
+    pub directions: [(i8, i8); 8],
 }
 
 impl King {
@@ -23,7 +30,11 @@ impl King {
             color,
             possible_moves: Vec::new(),
             name: String::from("King"),
-            symbol
+            symbol,
+            directions: [
+            (0, 1), (1, 0), (0, -1), (-1, 0),
+            (1, 1), (-1, -1), (-1, 1), (1, -1)
+            ],
         }
     }
 }
@@ -43,8 +54,31 @@ impl Piece for King {
         self.possible_moves = moves
     }
 
-    fn calculate_possible_moves(&mut self, board: &Board) -> Vec<String> {
-        Vec::new()
+    fn calculate_possible_moves(&mut self, board: &Board, calculate_check_moves: &bool) -> Vec<String> {
+        if self.color != board.get_active_color().to_char() {
+            self.possible_moves = Vec::new();
+            return self.get_possible_moves();
+        }
+
+        let mut possible_moves = HashSet::new();
+        let mut next_square: Coordinates;
+
+        for direction in KING_DIRECTIONS {
+            next_square = Coordinates::new_from_int(
+                &(self.coordinates.column + direction.0),
+                &(self.coordinates.row + direction.1)
+            );
+
+            if board.square_is_valid(&next_square) &&
+                !board.square_contains_piece_of_same_color(&next_square, &self.color) &&
+                !board.king_in_check_after_move(&self.coordinates, &next_square, calculate_check_moves) &&
+                !board.kings_adjacent(&next_square) {
+                possible_moves.insert(next_square.to_string());
+            }
+        }
+
+        self.possible_moves = possible_moves.into_iter().collect();
+        self.possible_moves.clone()
     }
 
     fn get_symbol(&self) -> String {
@@ -57,7 +91,7 @@ impl Piece for King {
 
     fn get_coordinates(&self) -> Coordinates { self.coordinates.clone() }
 
-    fn get_coordinates_string(&self) -> String { self.coordinates.get_coordinates_string() }
+    fn get_coordinates_string(&self) -> String { self.coordinates.to_string() }
 
     fn set_coordinates(&mut self, coordinates: Coordinates) {
         self.coordinates = coordinates;
