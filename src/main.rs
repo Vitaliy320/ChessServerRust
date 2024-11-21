@@ -14,11 +14,13 @@ mod websocket_server_new;
 mod connection_manager;
 mod game_end_condition;
 
+use std::collections::HashMap;
 use chess_engine::board::Board;
 use std::io::{self, Write};
 use tokio::net::TcpListener;
 use crate::chess_engine::coordinates::Coordinates;
 use dotenv::dotenv;
+use game::Game;
 
 struct Foo;
 impl Foo {
@@ -40,14 +42,50 @@ impl Foo {
     }
 }
 
+fn board_to_dict(board: &mut Board) -> HashMap<String, (String, Vec<String>)> {
+    let mut dict: HashMap<String, (String, Vec<String>)> = HashMap::new();
+    // todo: add calculation of possible moves for each piece in given position
+
+    for (coordinates, piece) in board.get_pieces_dict() {
+        match piece {
+            Some(p) => {
+                let piece_possible_coordinates = p.get_possible_moves();
+                let s = p.get_symbol();
+                dict.insert(coordinates.to_string(), (p.get_symbol(), piece_possible_coordinates));
+            },
+            _ => (),
+        }
+    }
+    dict
+}
 
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+    // let mut game = Game::new("c".to_string(), "white".to_string());
+    // let board = game.get_board().unwrap();
+    // for (coordinates, piece) in board.get_pieces_dict() {
+    //     match piece {
+    //         Some(p) => {
+    //             println!("piece: {}, possible moves: {:?}", p.get_symbol(), p.get_possible_moves());
+    //         },
+    //         _ => {}
+    //     }
+    // }
+    // // println!("{}", board.clone().board_dict_to_string(board.get_columns(), board.get_rows(), board_to_dict(board)));
+    // board.make_move_chars(('e', '2'), ('e', '3'));
+    // for (coordinates, piece) in board.get_pieces_dict() {
+    //     match piece {
+    //         Some(p) => {
+    //             println!("piece: {}, possible moves: {:?}", p.get_symbol(), p.get_possible_moves());
+    //         },
+    //         _ => {}
+    //     }
+    // }
+    // println!("{}", board.clone().board_dict_to_string(board.get_columns(), board.get_rows(), board_to_dict(board)));
+
     // let mut foo = Foo{};
     // foo.foo().await;
-
-    // let _ = websocket_server_new::run_server().await;
 
     let _ = server::run_server().await;
 }

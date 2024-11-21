@@ -42,7 +42,7 @@ impl Game {
         let rows = "12345678".to_string();
         let board_size = 8;
         // let board_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string();
-        let board_fen = "3kq3/4p3/8/8/8/8/4P3/2Q1K3 w KQkq - 0 1".to_string();
+        let board_fen = "rnb2bnr/1ppkpppp/p7/3N4/8/8/PPPP1PPP/RNBQKB1R w KQkq - 0 1".to_string();
 
         //todo: replace uuid with i32. When the board is created, the board_id field will be updated
         let game_id = Uuid::new_v4();

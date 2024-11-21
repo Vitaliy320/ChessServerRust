@@ -62,6 +62,7 @@ impl Piece for King {
 
         let mut possible_moves = HashSet::new();
         let mut next_square: Coordinates;
+        let mut king_in_check_after_move: bool;
 
         for direction in KING_DIRECTIONS {
             next_square = Coordinates::new_from_int(
@@ -69,9 +70,11 @@ impl Piece for King {
                 &(self.coordinates.row + direction.1)
             );
 
+            // king_in_check_after_move = *calculate_check_moves && board.king_in_check_after_move(&self.coordinates, &next_square);
             if board.square_is_valid(&next_square) &&
                 !board.square_contains_piece_of_same_color(&next_square, &self.color) &&
-                !board.king_in_check_after_move(&self.coordinates, &next_square, calculate_check_moves) &&
+                !(*calculate_check_moves && board.king_in_check_after_move(&self.coordinates, &next_square)) &&
+                // !board.square_is_attacked_new_board(&next_square, &board.get_active_color()) &&
                 !board.kings_adjacent(&next_square) {
                 possible_moves.insert(next_square.to_string());
             }

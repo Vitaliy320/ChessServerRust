@@ -53,42 +53,46 @@ impl Piece for Pawn {
         let mut possible_moves = HashSet::new();
         let rows = board.get_rows();
         let direction: i8 = if self.color == 'w' { 1 } else { -1 };
+        let mut next_square: Coordinates;
 
         // one square move
-        let next_square = Coordinates::new_from_int(
+        next_square = Coordinates::new_from_int(
             &self.coordinates.column, &(self.coordinates.row + direction)
         );
 
         if board.square_is_valid(&next_square)
             && board.square_is_free(&next_square)
-            && !board.king_in_check_after_move(&self.coordinates, &next_square, calculate_check_moves) {
+            && !(*calculate_check_moves && board.king_in_check_after_move(&self.coordinates, &next_square)) {
             possible_moves.insert(next_square.to_string());
         }
 
         // two squares move from starting position
         if (self.color == 'w' && self.coordinates.row_char() == rows.chars().nth(1).unwrap()) ||
             (self.color == 'b' && self.coordinates.row_char() == rows.chars().rev().nth(1).unwrap()) {
-            let next_square = Coordinates::new_from_int(
+            next_square = Coordinates::new_from_int(
                 &self.coordinates.column, &(self.coordinates.row + 2 * direction)
             );
             if board.square_is_valid(&next_square)
                 && board.square_is_free(&next_square)
-                && !board.king_in_check_after_move(&self.coordinates, &next_square, &true) {
+                && !(*calculate_check_moves && board.king_in_check_after_move(&self.coordinates, &next_square)) {
                 possible_moves.insert(next_square.to_string());
             }
         }
 
         // capture move
-        let mut next_square: Coordinates;
         for col_shift in [-1, 1].iter() {
             next_square = Coordinates::new_from_int(
                 &(self.coordinates.column + col_shift),
                 &(self.coordinates.row + direction)
             );
 
-            if board.square_is_valid(&next_square)
-                && board.square_is_capturable(&next_square, &self.color)
-                && !board.king_in_check_after_move(&self.coordinates, &next_square, &true) {
+            if board.square_is_valid(&next_square) &&
+                !board.square_contains_piece_of_same_color(&next_square, &self.color)
+                /*&& (
+                    board.square_is_free(&next_square)
+                    || board.square_is_capturable(&next_square, &self.color)
+                )*/
+                && !(*calculate_check_moves && board.king_in_check_after_move(&self.coordinates, &next_square)) {
                 possible_moves.insert(next_square.to_string());
             }
         }
