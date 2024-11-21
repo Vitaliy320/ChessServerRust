@@ -1,3 +1,5 @@
+.env
+.env-docker
 /target
 /chesslib_Rust
 /.idea
