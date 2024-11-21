@@ -5,7 +5,7 @@ use crate::chess_engine::piece::Piece;
 
 const KNIGHT_DIRECTIONS: [(i8, i8); 8] = [
     (1, 2), (2, 1), (2, -1), (1, -2),
-    (-1, -2), (-2, -1), (-2, -1), (-1, 2),
+    (-1, -2), (-2, -1), (-2, 1), (-1, 2),
 ];
 
 #[derive(Debug, Clone)]
@@ -65,8 +65,8 @@ impl Piece for Knight {
             );
 
             if board.square_is_valid(&next_square) &&
-                !board.square_contains_piece_of_same_color(&next_square, &self.color) &&
-                !board.king_in_check_after_move(&self.coordinates, &next_square, calculate_check_moves) {
+                !board.square_contains_piece_of_same_color(&next_square, &self.color)
+                && !(*calculate_check_moves && board.king_in_check_after_move(&self.coordinates, &next_square)) {
                 possible_moves.insert(next_square.to_string());
             }
         }

@@ -71,7 +71,7 @@ impl Piece for Rook {
                 }
 
                 if board.square_is_valid(&next_square)
-                    && !board.king_in_check_after_move(&self.coordinates, &next_square, calculate_check_moves) {
+                    && !(*calculate_check_moves && board.king_in_check_after_move(&self.coordinates, &next_square)) {
                     if board.square_is_free(&next_square) {
                         possible_moves.insert(next_square.to_string());
                     } else if board.square_is_capturable(&next_square, &self.get_color()) {
