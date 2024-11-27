@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use crate::chess_engine::board::Board;
+use crate::chess_engine::color::ActiveColor;
 use crate::chess_engine::coordinates::Coordinates;
 use crate::chess_engine::piece::Piece;
 
@@ -44,11 +45,11 @@ impl Piece for Bishop {
         self.possible_moves = moves
     }
 
-    fn calculate_possible_moves(&mut self, board: &Board, calculate_check_moves: &bool) -> Vec<String> {
-        if self.color != board.get_active_color().to_char() {
-            self.possible_moves = Vec::new();
-            return self.get_possible_moves();
-        }
+    fn calculate_possible_moves(&mut self, board: &Board, color: &ActiveColor, calculate_check_moves: &bool) -> Vec<String> {
+        // if self.color != board.get_active_color().to_char() {
+        //     self.possible_moves = Vec::new();
+        //     return self.get_possible_moves();
+        // }
 
         let mut possible_moves = HashSet::new();
         let mut next_square: Coordinates;
@@ -70,7 +71,11 @@ impl Piece for Bishop {
                 }
 
                 if board.square_is_valid(&next_square)
-                    && !(*calculate_check_moves && board.king_in_check_after_move(&self.coordinates, &next_square)) {
+                    && !(*calculate_check_moves && board.king_in_check_after_move(
+                    &self.coordinates,
+                    &next_square,
+                    &ActiveColor::new_from_char(self.color).unwrap(),
+                )) {
                     if board.square_is_free(&next_square) {
                         possible_moves.insert(next_square.to_string());
                     } else if board.square_is_capturable(&next_square, &self.get_color()) {

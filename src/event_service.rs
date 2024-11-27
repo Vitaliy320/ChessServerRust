@@ -68,9 +68,9 @@ impl EventService{
                 println!("Game created with ID: {}.\n{}", game_id, message);
             },
 
-            Response::AuthorizeWebsocketConnectionResponse { game_id, user_id, connection_id, message } => {
+            Response::AuthorizeWebsocketConnectionResponse { game_id, user_id, connection_id, board, message } => {
                 println!("{}", message);
-                self.send_authorized_message(game_id.clone(), user_id.clone(), connection_id.clone(), message.clone()).await;
+                self.send_authorized_message(game_id.clone(), user_id.clone(), connection_id.clone(), board.clone(), message.clone()).await;
             },
 
             Response::MakeMoveResponse { game_id, message, columns, rows, board, game_status, game_end_condition } => {
@@ -93,6 +93,7 @@ impl EventService{
         game_id: Uuid,
         user_id: String,
         connection_id: SocketAddr,
+        board: HashMap<String, (String, Vec<String>)>,
         message: String) {
 
         // let peers = peer_map.lock().await;
@@ -108,7 +109,7 @@ impl EventService{
         let game_manager_lock = self.game_manager.read().await;
         match game_manager_lock.connection_manager.ws_connection_id.get(&connection_id) {
             Some(connection) => {
-                let response = Response::AuthorizeWebsocketConnectionResponse { game_id, user_id, connection_id, message, };
+                let response = Response::AuthorizeWebsocketConnectionResponse { game_id, user_id, connection_id, board, message, };
                 let response_text = serde_json::to_string(&response).unwrap();
 
                 // let message = tokio_websockets::Message::text(response_text.clone());

@@ -7,6 +7,7 @@ use crate::chess_engine::{
     king::King,
 };
 use crate::chess_engine::board::Board;
+use crate::chess_engine::color::ActiveColor;
 use crate::chess_engine::coordinates::Coordinates;
 
 #[derive(Debug, Clone)]
@@ -28,7 +29,7 @@ enum FunctionVariant<F, Fp, P> {
 pub trait Piece {
     fn get_possible_moves(&self) -> Vec<String>;
     fn set_possible_moves(&mut self, moves: Vec<String>);
-    fn calculate_possible_moves(&mut self, board: &Board, calculate_check_moves: &bool) -> Vec<String>;
+    fn calculate_possible_moves(&mut self, board: &Board, color: &ActiveColor, calculate_check_moves: &bool) -> Vec<String>;
     fn get_symbol(&self) -> String;
     fn get_color(&self) -> char;
     fn get_coordinates(&self) -> Coordinates;
@@ -139,13 +140,13 @@ impl PieceEnum {
             piece.set_possible_moves(params), moves),)
     }
 
-    pub fn calculate_possible_moves(&mut self, board: &Board, calculate_check_moves: &bool) -> Vec<String> {
+    pub fn calculate_possible_moves(&mut self, board: &Board, color: &ActiveColor, calculate_check_moves: &bool) -> Vec<String> {
         let mut possible_moves: Vec<String> = Vec::new();
         dispatch_variant_mut(
             self,
-            FunctionVariant::<fn(&mut dyn Piece), _, (&Board, &bool)>::WithParams(
-                |piece: &mut dyn Piece, (board_, calculate_check)|
-                    possible_moves = piece.calculate_possible_moves(board_, calculate_check), (board, calculate_check_moves)
+            FunctionVariant::<fn(&mut dyn Piece), _, (&Board, &ActiveColor, &bool)>::WithParams(
+                |piece: &mut dyn Piece, (board_, color, calculate_check)|
+                    possible_moves = piece.calculate_possible_moves(board_, color, calculate_check), (board, color, calculate_check_moves)
             ),
         );
         possible_moves

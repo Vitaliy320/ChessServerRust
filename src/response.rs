@@ -18,6 +18,7 @@ pub enum Response {
         game_id: Uuid,
         user_id: String,
         connection_id: SocketAddr,
+        board: HashMap<String, (String, Vec<String>)>,
         message: String,
     },
     MakeMoveResponse {
@@ -55,11 +56,12 @@ impl IntoResponse for Response {
                 }));
                 (StatusCode::OK, body).into_response()
             },
-            Response::AuthorizeWebsocketConnectionResponse { game_id, user_id, connection_id, message } => {
+            Response::AuthorizeWebsocketConnectionResponse { game_id, user_id, connection_id, board, message } => {
                 let body = Json(serde_json::json!({
                     "game_id": game_id,
                     "user_id": user_id,
                     "connection_id": connection_id,
+                    "board": board,
                     "message": message,
                 }));
                 (StatusCode::OK, body).into_response()

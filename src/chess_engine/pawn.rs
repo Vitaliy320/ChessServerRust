@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use crate::chess_engine::board::Board;
+use crate::chess_engine::color::ActiveColor;
 use crate::chess_engine::coordinates::Coordinates;
 use crate::chess_engine::piece::Piece;
 
@@ -44,11 +45,11 @@ impl Piece for Pawn {
         self.possible_moves = moves
     }
 
-    fn calculate_possible_moves(&mut self, board: &Board, calculate_check_moves: &bool) -> Vec<String> {
-        if self.color != board.get_active_color().to_char() {
-            self.possible_moves = Vec::new();
-            return Vec::new();
-        }
+    fn calculate_possible_moves(&mut self, board: &Board, color: &ActiveColor, calculate_check_moves: &bool) -> Vec<String> {
+        // if self.color != board.get_active_color().to_char() {
+        //     self.possible_moves = Vec::new();
+        //     return Vec::new();
+        // }
 
         let mut possible_moves = HashSet::new();
         let rows = board.get_rows();
@@ -62,23 +63,31 @@ impl Piece for Pawn {
 
         if board.square_is_valid(&next_square)
             && board.square_is_free(&next_square)
-            && !(*calculate_check_moves && board.king_in_check_after_move(&self.coordinates, &next_square)) {
+            && !(*calculate_check_moves && board.king_in_check_after_move(
+            &self.coordinates,
+            &next_square,
+            &ActiveColor::new_from_char(self.color).unwrap(),
+        )) {
             possible_moves.insert(next_square.to_string());
-        }
 
-        // two squares move from starting position
-        if (self.color == 'w' && self.coordinates.row_char() == rows.chars().nth(1).unwrap()) ||
-            (self.color == 'b' && self.coordinates.row_char() == rows.chars().rev().nth(1).unwrap()) {
-            next_square = Coordinates::new_from_int(
-                &self.coordinates.column, &(self.coordinates.row + 2 * direction)
-            );
-            if board.square_is_valid(&next_square)
-                && board.square_is_free(&next_square)
-                && !(*calculate_check_moves && board.king_in_check_after_move(&self.coordinates, &next_square)) {
-                possible_moves.insert(next_square.to_string());
+
+            // two squares move from starting position
+            if (self.color == 'w' && self.coordinates.row_char() == rows.chars().nth(1).unwrap()) ||
+                (self.color == 'b' && self.coordinates.row_char() == rows.chars().rev().nth(1).unwrap()) {
+                next_square = Coordinates::new_from_int(
+                    &self.coordinates.column, &(self.coordinates.row + 2 * direction)
+                );
+                if board.square_is_valid(&next_square)
+                    && board.square_is_free(&next_square)
+                    && !(*calculate_check_moves && board.king_in_check_after_move(
+                    &self.coordinates,
+                    &next_square,
+                    &ActiveColor::new_from_char(self.color).unwrap(),
+                )) {
+                    possible_moves.insert(next_square.to_string());
+                }
             }
         }
-
         // capture move
         for col_shift in [-1, 1].iter() {
             next_square = Coordinates::new_from_int(
@@ -87,12 +96,16 @@ impl Piece for Pawn {
             );
 
             if board.square_is_valid(&next_square) &&
-                !board.square_contains_piece_of_same_color(&next_square, &self.color)
+                board.square_is_capturable(&next_square, &self.color)
                 /*&& (
                     board.square_is_free(&next_square)
                     || board.square_is_capturable(&next_square, &self.color)
                 )*/
-                && !(*calculate_check_moves && board.king_in_check_after_move(&self.coordinates, &next_square)) {
+                && !(*calculate_check_moves && board.king_in_check_after_move(
+                &self.coordinates,
+                &next_square,
+                &ActiveColor::new_from_char(self.color).unwrap(),
+            )) {
                 possible_moves.insert(next_square.to_string());
             }
         }

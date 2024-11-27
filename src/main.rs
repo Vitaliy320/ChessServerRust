@@ -42,23 +42,6 @@ impl Foo {
     }
 }
 
-fn board_to_dict(board: &mut Board) -> HashMap<String, (String, Vec<String>)> {
-    let mut dict: HashMap<String, (String, Vec<String>)> = HashMap::new();
-    // todo: add calculation of possible moves for each piece in given position
-
-    for (coordinates, piece) in board.get_pieces_dict() {
-        match piece {
-            Some(p) => {
-                let piece_possible_coordinates = p.get_possible_moves();
-                let s = p.get_symbol();
-                dict.insert(coordinates.to_string(), (p.get_symbol(), piece_possible_coordinates));
-            },
-            _ => (),
-        }
-    }
-    dict
-}
-
 #[tokio::main]
 async fn main() {
     dotenv().ok();

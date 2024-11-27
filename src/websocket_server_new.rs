@@ -133,10 +133,32 @@ async fn authorize(
     address: SocketAddr,
     unbounded_sender: Tx,
 ) {
-    let result = game_manager.write().await.connection_manager.add_connection(&game_id, &user_id, Some(address), Some(Arc::new(Mutex::new(unbounded_sender))));
+    let mut user_color: Option<ActiveColor>;
+    {
+        let g_m_guard = game_manager.read().await;
+        let game = g_m_guard.get_game_by_id(&game_id).await;
+        user_color = match game {
+            Ok(game) => game.color_by_user_id.get(&user_id).cloned(),
+            _ => return
+        };
+    }
+
+    let (board, result) = {
+        let mut game_manager = game_manager.write().await;
+        let mut game = match game_manager.get_mutable_game_by_id(&game_id).await {
+            Ok(mut game) => game,
+            Err(_) => { return }
+        };
+
+        let board = game.get_board().unwrap().board_to_dict_by_active_color();
+        let result = game_manager.connection_manager.add_connection(&game_id, &user_id, Some(address), Some(Arc::new(Mutex::new(unbounded_sender))));
+        (board, result)
+    };
+
     match result {
         Ok(message) | Err(message) => {
-            let response = Response::AuthorizeWebsocketConnectionResponse { game_id, user_id, connection_id: address, message };
+            // println!("board in response: {:?}", board);
+            let response = Response::AuthorizeWebsocketConnectionResponse { game_id, user_id, connection_id: address, board, message };
             event_service.read().await.publish(&response).await;
         },
     }
@@ -184,7 +206,7 @@ async fn make_move(
                     game_end_condition: game.get_game_end_condition(),
                 },
                 Some(board) => {
-                    match user_color {
+                    match &user_color {
                         Some(color) => {
                             if !color.equals(board.get_active_color()){
                                 return Response::RequestFailedResponse {
@@ -211,7 +233,7 @@ async fn make_move(
                                 message: format!("Made move from {} to {}", from, to),
                                 columns: board.get_columns(),
                                 rows: board.get_rows(),
-                                board: board_to_dict(board),
+                                board: board.board_to_dict_by_active_color(),
                                 game_status: game.get_game_status(),
                                 game_end_condition: game.get_game_end_condition(),
                             }
@@ -226,21 +248,4 @@ async fn make_move(
     };
     event_service.read().await.publish(&response).await;
     response
-}
-
-fn board_to_dict(board: &mut Board) -> HashMap<String, (String, Vec<String>)> {
-    let mut dict: HashMap<String, (String, Vec<String>)> = HashMap::new();
-    // todo: add calculation of possible moves for each piece in given position
-
-    for (coordinates, piece) in board.get_pieces_dict() {
-        match piece {
-            Some(p) => {
-                let piece_possible_coordinates = p.get_possible_moves();
-                let s = p.get_symbol();
-                dict.insert(coordinates.to_string(), (p.get_symbol(), piece_possible_coordinates));
-            },
-            _ => (),
-        }
-    }
-    dict
 }

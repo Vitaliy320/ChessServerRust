@@ -11,6 +11,14 @@ pub enum ActiveColor {
 }
 
 impl ActiveColor {
+    pub fn new_from_char(color: char) -> Result<Self, String> {
+        match color {
+            'w' => Ok(ActiveColor::White),
+            'b' => Ok(ActiveColor::Black),
+            _ => Err(format!("Invalid color: {}", color)),
+        }
+    }
+
     pub fn to_char(&self) -> char {
         match self {
             ActiveColor::White => 'w',

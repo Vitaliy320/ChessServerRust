@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use crate::chess_engine::board::Board;
+use crate::chess_engine::color::ActiveColor;
 use crate::chess_engine::coordinates::Coordinates;
 use crate::chess_engine::piece::Piece;
 
@@ -54,15 +55,14 @@ impl Piece for King {
         self.possible_moves = moves
     }
 
-    fn calculate_possible_moves(&mut self, board: &Board, calculate_check_moves: &bool) -> Vec<String> {
-        if self.color != board.get_active_color().to_char() {
-            self.possible_moves = Vec::new();
-            return self.get_possible_moves();
-        }
+    fn calculate_possible_moves(&mut self, board: &Board, color: &ActiveColor, calculate_check_moves: &bool) -> Vec<String> {
+        // if self.color != board.get_active_color().to_char() {
+        //     self.possible_moves = Vec::new();
+        //     return self.get_possible_moves();
+        // }
 
         let mut possible_moves = HashSet::new();
         let mut next_square: Coordinates;
-        let mut king_in_check_after_move: bool;
 
         for direction in KING_DIRECTIONS {
             next_square = Coordinates::new_from_int(
@@ -73,12 +73,23 @@ impl Piece for King {
             // king_in_check_after_move = *calculate_check_moves && board.king_in_check_after_move(&self.coordinates, &next_square);
             if board.square_is_valid(&next_square) &&
                 !board.square_contains_piece_of_same_color(&next_square, &self.color) &&
-                !(*calculate_check_moves && board.king_in_check_after_move(&self.coordinates, &next_square)) &&
+                !(*calculate_check_moves && board.king_in_check_after_move(
+                    &self.coordinates,
+                    &next_square,
+                    &ActiveColor::new_from_char(self.color).unwrap(),
+                )) &&
                 // !board.square_is_attacked_new_board(&next_square, &board.get_active_color()) &&
                 !board.kings_adjacent(&next_square) {
                 possible_moves.insert(next_square.to_string());
             }
         }
+
+        //castle squares
+        // for square in board.get_castle_squares(&board.get_active_color()) {
+        //     if let Some(square) = square {
+        //         possible_moves.insert(square.to_string());
+        //     }
+        // }
 
         self.possible_moves = possible_moves.into_iter().collect();
         self.possible_moves.clone()

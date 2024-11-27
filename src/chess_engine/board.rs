@@ -3,10 +3,10 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::format;
 use std::hash::Hash;
 use std::sync::Arc;
-use crate::chess_engine::piece::Piece;
+// use crate::chess_engine::piece::Piece;
 use crate::chess_engine::piece::PieceEnum;
 use crate::chess_engine::coordinates::Coordinates;
-use crate::chess_engine::color::ActiveColor;
+use crate::chess_engine::color::{ActiveColor};
 
 #[derive(Debug, Clone)]
 pub struct Board {
@@ -27,8 +27,10 @@ pub struct Board {
     rows_set: HashSet<char>,
     bottom_left_square: Coordinates,
     top_right_square: Coordinates,
-    w_king_position: Option<Coordinates>,
-    b_king_position: Option<Coordinates>,
+    w_king_square: Option<Coordinates>,
+    b_king_square: Option<Coordinates>,
+    w_king_in_check: bool,
+    b_king_in_check: bool,
 }
 
 impl Board {
@@ -64,12 +66,21 @@ impl Board {
                 &(rows.chars().rev().nth(0).unwrap())
             ),
             // todo: update to get kings positions from fen
-            w_king_position: None,
-            b_king_position: None,
+            w_king_square: None,
+            b_king_square: None,
+            w_king_in_check: false,
+            b_king_in_check: false,
         };
         board.create_pieces_from_fen(fen);
         // board.pieces = board.create_pieces();
-        board.calculate_possible_moves(&true);
+        board.calculate_possible_moves(&ActiveColor::White, &true);
+        board.calculate_possible_moves(&ActiveColor::Black, &true);
+        // println!("board possible moves: {:?}", board.possible_moves);
+
+        board.update_check_status(&ActiveColor::White);
+        board.update_check_status(&ActiveColor::Black);
+        // println!("board possible moves: {:?}", board.possible_moves);
+        println!("white king in check: {}, black king in check: {}", board.w_king_in_check, board.b_king_in_check);
         board
     }
 
@@ -87,7 +98,7 @@ impl Board {
         columns: String,
         rows: String,
     ) -> Board {
-        //todo: update to get w_king_position and b_king_position from pieces
+        //todo: update to get w_king_square and b_king_square from pieces
         let active_color_enum = match active_color {
             'b' => ActiveColor::Black,
             _ => ActiveColor::White,
@@ -116,8 +127,10 @@ impl Board {
                 &(columns.chars().rev().nth(0).unwrap()),
                 &(rows.chars().rev().nth(0).unwrap())
             ),
-            w_king_position: None,
-            b_king_position: None,
+            w_king_square: None,
+            b_king_square: None,
+            w_king_in_check: false,
+            b_king_in_check: false,
         };
 
         for row in board.rows.chars() {
@@ -128,7 +141,12 @@ impl Board {
                 }
             }
         }
-        board.calculate_possible_moves(&true);
+
+        board.calculate_possible_moves(&ActiveColor::White, &true);
+        board.calculate_possible_moves(&ActiveColor::Black, &true);
+
+        board.update_check_status(&ActiveColor::White);
+        board.update_check_status(&ActiveColor::Black);
         board
     }
 
@@ -218,10 +236,10 @@ impl Board {
                     let coordinates = Coordinates::new_from_char(&column_coordinate, &row_coordinate);
                     piece = PieceEnum::new(coordinates.clone(), cell_value);
                     if &piece.get_symbol() == "K" && &piece.get_color() == &'w' {
-                        self.w_king_position = Some(coordinates.clone());
+                        self.w_king_square = Some(coordinates.clone());
                     }
                     if &piece.get_symbol() == "k" && &piece.get_color() == &'b' {
-                        self.b_king_position = Some(coordinates.clone());
+                        self.b_king_square = Some(coordinates.clone());
                     }
 
                     self.pieces.insert(coordinates, Some(piece));
@@ -344,6 +362,7 @@ impl Board {
                 }
             }
         }
+
         if let Some(piece_option) = self.pieces.get_mut(&move_from) {
             match piece_option.take() {
                 Some(mut piece) => {
@@ -352,28 +371,35 @@ impl Board {
                         return false;
                     }
                     if piece.get_symbol() == "K" && piece.get_color() == 'w' {
-                        self.w_king_position = Some(move_to.clone());
+                        self.w_king_square = Some(move_to.clone());
                     }
 
                     if piece.get_symbol() == "k" && piece.get_color() == 'b' {
-                        self.b_king_position = Some(move_to.clone());
+                        self.b_king_square = Some(move_to.clone());
                     }
 
                     piece.set_coordinates(&move_to);
-                    self.pieces.insert(move_to.clone(), Some(piece));
                     self.pieces.insert(move_from.clone(), None);
+                    self.pieces.insert(move_to.clone(), Some(piece));
                 },
                 _ => return false,
             }
         }
 
         if calculate_new_moves {
+            self.update_check_status(&self.active_color.clone());
             self.active_color = self.active_color.next();
-            self.calculate_possible_moves(&true);
+
+            let color_clone = self.active_color.clone();
+            self.calculate_possible_moves(&color_clone, &true);
+            self.calculate_possible_moves(&color_clone.next(), &false);
+            self.update_check_status(&color_clone);
+
             let s = format!("{}{}", move_from.to_string(), move_to.to_string());
             println!("make_move_str square: {}", s);
         }
         self.fen = self.board_to_fen();
+        println!("white king in check: {}, black king in check: {}", self.w_king_in_check, self.b_king_in_check);
         true
     }
 
@@ -401,7 +427,7 @@ impl Board {
         )
     }
 
-    pub fn make_move_without_validation(
+    pub fn make_move_without_move_validation(
         &mut self,
         move_from: &Coordinates,
         move_to: &Coordinates,
@@ -411,17 +437,17 @@ impl Board {
                 match piece.take() {
                     Some(mut piece) => {
                         if piece.get_symbol() == "K" && piece.get_color() == 'w' {
-                            self.w_king_position = Some(move_to.clone());
+                            self.w_king_square = Some(move_to.clone());
                         }
 
                         if piece.get_symbol() == "k" && piece.get_color() == 'b' {
-                            self.b_king_position = Some(move_to.clone());
+                            self.b_king_square = Some(move_to.clone());
                         }
                         piece.set_coordinates(&move_to);
-                        self.pieces.insert(move_to.clone(), Some(piece.clone()));
                         self.pieces.insert(move_from.clone(), None);
+                        self.pieces.insert(move_to.clone(), Some(piece.clone()));
                         self.active_color = self.active_color.next();
-                        self.calculate_possible_moves(&false);
+                        self.calculate_possible_moves(&self.active_color.clone(), &false);
                     },
                     _ => { },
                 }
@@ -429,6 +455,34 @@ impl Board {
 
             _ => { },
         };
+    }
+
+    pub fn update_check_status(&mut self, color: &ActiveColor) {
+        let mut board_clone = self.clone();
+
+        let (coordinates_to_check, mut king_in_check) = match color {
+            ActiveColor::White => (&board_clone.w_king_square, &mut self.w_king_in_check),
+            ActiveColor::Black => (&board_clone.b_king_square, &mut self.b_king_in_check),
+        };
+
+        for piece in self.pieces.values_mut() {
+            match piece {
+                Some(ref mut piece) => {
+                    if piece.get_color() != color.to_char() {
+                        if let Some(coordinates_to_check) = coordinates_to_check {
+                            println!("piece: {}, piece possible moves: {:?}", piece.get_symbol(), piece.get_possible_moves());
+                            if piece.get_possible_moves().contains(&(*coordinates_to_check).to_string()) {
+                                *king_in_check = true;
+                                return
+                            }
+                        }
+                    }
+                },
+                _ => {},
+            }
+        }
+
+        *king_in_check = false;
     }
 
     pub fn board_to_string(&mut self) -> String {
@@ -459,6 +513,45 @@ impl Board {
         board_string
     }
 
+    pub fn board_to_dict(&mut self) -> HashMap<String, (String, Vec<String>)> {
+        let mut dict: HashMap<String, (String, Vec<String>)> = HashMap::new();
+        // todo: add calculation of possible moves for each piece in given position
+
+        for (coordinates, piece) in self.get_pieces_dict() {
+            match piece {
+                Some(p) => {
+                    let piece_possible_coordinates = p.get_possible_moves();
+                    let s = p.get_symbol();
+                    dict.insert(coordinates.to_string(), (p.get_symbol(), piece_possible_coordinates));
+                },
+                _ => (),
+            }
+        }
+        dict
+    }
+
+    pub fn board_to_dict_by_active_color(&mut self) -> HashMap<String, (String, Vec<String>)> {
+        let mut dict: HashMap<String, (String, Vec<String>)> = HashMap::new();
+        // todo: add calculation of possible moves for each piece in given position
+
+        for (coordinates, piece) in self.get_pieces_dict() {
+            match piece {
+                Some(p) => {
+                    let piece_possible_coordinates = p.get_possible_moves();
+                    let s = p.get_symbol();
+                    if p.get_color() == self.active_color.to_char() {
+                        dict.insert(coordinates.to_string(), (p.get_symbol(), piece_possible_coordinates));
+                    } else {
+                        dict.insert(coordinates.to_string(), (p.get_symbol(), Vec::new()));
+                    }
+
+                },
+                _ => (),
+            }
+        }
+        dict
+    }
+
     pub fn board_dict_to_string(&self, columns: String, rows: String, board: HashMap<String, (String, Vec<String>)>) -> String {
         let board_string: String = rows.chars()
             .rev()
@@ -486,20 +579,33 @@ impl Board {
         ))
     }
 
-    fn calculate_possible_moves(&mut self, calculate_check_moves: &bool) {
+    fn calculate_possible_moves(&mut self, color: &ActiveColor, calculate_check_moves: &bool) {
         let board_clone = &self.clone();
+        // let (king_coordinates, king_color, king_in_check) = match board_clone.active_color {
+        //     ActiveColor::White => (&board_clone.w_king_square, &board_clone.active_color),
+        //     ActiveColor::Black => (&board_clone.b_king_square, &board_clone.active_color),
+        // };
+        //
+        // let king_coordinates = match king_coordinates {
+        //     Some(king_coordinates) => king_coordinates,
+        //     None => return,
+        // };
+
         for piece in self.pieces.values_mut() {
             if let Some(piece) = piece {
-                let possible_moves = piece.calculate_possible_moves(board_clone, calculate_check_moves);
-                // println!("board:\n{}\nactive color: {}\npiece: {}\npossible moves: {:?}",
-                //          board_clone.clone().board_to_string(), self.active_color.to_char(), piece.get_symbol(), possible_moves);
-                // println!("possible_moves: {:?}", possible_moves);
-                self.possible_moves.insert(
-                    piece.get_coordinates_string(),
-                    (piece.get_symbol(), possible_moves)
-                );
+                if piece.get_color() == color.to_char() {
+                    let possible_moves = piece.calculate_possible_moves(board_clone, color, calculate_check_moves);
+                    // println!("board:\n{}\nactive color: {}\npiece: {}\npossible moves: {:?}",
+                    //          board_clone.clone().board_to_string(), self.active_color.to_char(), piece.get_symbol(), possible_moves);
+                    // println!("possible_moves: {:?}", possible_moves);
+                    self.possible_moves.insert(
+                        piece.get_coordinates_string(),
+                        (piece.get_symbol(), possible_moves)
+                    );
+                }
             }
         }
+        // println!("board.possible_moves: {:?}", self.possible_moves)
     }
 
     pub fn square_is_valid(&self, coordinates: &Coordinates) -> bool {
@@ -515,11 +621,13 @@ impl Board {
     pub fn square_is_capturable(&self, coordinates: &Coordinates, color: &char) -> bool {
         match self.pieces.get(&coordinates).unwrap() {
             Some(p) => {
-                if !["k", "K"].contains(&p.get_symbol().as_str())
-                    && p.get_color() != *color {
-                    false;
+                // println!("first color: {}, piece: {}, color: {}", color, p.get_symbol(), p.get_color());
+                let a = p.get_color();
+                let b = *color;
+                if p.get_color() != *color {
+                    return true;
                 }
-                true
+                false
             },
             _ => false,
         }
@@ -553,14 +661,15 @@ impl Board {
         &self,
         from_coordinates: &Coordinates,
         to_coordinates: &Coordinates,
+        king_color: &ActiveColor,
         // calculate_check_moves: &bool,
     ) -> bool {
         // match calculate_check_moves {
         //     true => {
-            let king_color = self.get_active_color();
+        //     let king_color = self.get_active_color();
             // println!("board before move: {:?}", self.get_pieces_vec());
             let mut board_after_move = self.clone();
-            board_after_move.make_move_without_validation(from_coordinates, to_coordinates);
+            board_after_move.make_move_without_move_validation(from_coordinates, to_coordinates);
             // println!("board before move:\n{}", &self.clone().board_to_string());
             // let mut board_after_move = self.clone();
             // match board_after_move.pieces.get_mut(&from_coordinates) {
@@ -588,22 +697,22 @@ impl Board {
 
     pub fn king_is_in_check(&self, color: &ActiveColor) -> bool {
         let king_square = match color {
-            ActiveColor::White => &self.w_king_position.to_owned().unwrap(),
-            ActiveColor::Black => &self.b_king_position.to_owned().unwrap(),
+            ActiveColor::White => &self.w_king_square.to_owned().unwrap(),
+            ActiveColor::Black => &self.b_king_square.to_owned().unwrap(),
         };
 
         self.square_is_attacked(king_square, color)
     }
 
     pub fn square_is_attacked(&self, coordinates: &Coordinates, color: &ActiveColor) -> bool {
-        let color = color.to_char();
+        let color_char = color.to_char();
         for piece in self.pieces.values() {
             match piece {
                 Some(piece) => {
-                    if piece.get_color() != color {
+                    if piece.get_color() != color_char {
                         let mut new_piece = piece.clone();
                         // println!("Check validation: {}, {}", new_piece.get_symbol(), new_piece.get_color());
-                        new_piece.calculate_possible_moves(&self, &false);
+                        new_piece.calculate_possible_moves(&self, color,&false);
                         // println!("Possible moves: {:?}", new_piece.get_possible_moves());
                         if new_piece.get_possible_moves().contains(&coordinates.to_string()) {
                             return true;
@@ -619,14 +728,14 @@ impl Board {
     pub fn square_is_attacked_new_board(&self, coordinates: &Coordinates, color: &ActiveColor) -> bool {
         let mut new_board = self.clone();
         new_board.active_color = new_board.active_color.next();
-        let color = color.to_char();
+        let color_char = color.to_char();
         for piece in new_board.pieces.values() {
             match piece {
                 Some(piece) => {
-                    if piece.get_color() != color {
+                    if piece.get_color() != color_char {
                         let mut new_piece = piece.clone();
                         // println!("Check validation: {}, {}", new_piece.get_symbol(), new_piece.get_color());
-                        new_piece.calculate_possible_moves(&new_board, &false);
+                        new_piece.calculate_possible_moves(&new_board, color, &false);
                         // println!("Possible moves: {:?}", new_piece.get_possible_moves());
                         if new_piece.get_possible_moves().contains(&coordinates.to_string()) {
                             return true;
@@ -641,13 +750,13 @@ impl Board {
 
     pub fn kings_adjacent(&self, square_to_check: &Coordinates) -> bool {
         let another_king_square = match self.active_color {
-            ActiveColor::White => &self.b_king_position,
-            ActiveColor::Black => &self.w_king_position,
+            ActiveColor::White => &self.b_king_square,
+            ActiveColor::Black => &self.w_king_square,
         };
 
         let distance_between_squares = (
-            (square_to_check.column - another_king_square.to_owned().unwrap().column) as u32,
-            (square_to_check.row - another_king_square.to_owned().unwrap().row) as u32,
+            (square_to_check.column - another_king_square.to_owned().unwrap().column).abs(),
+            (square_to_check.row - another_king_square.to_owned().unwrap().row).abs(),
         );
 
         if distance_between_squares.0 <= 1 && distance_between_squares.1 <= 1 {
@@ -661,6 +770,50 @@ impl Board {
             (square1.column - square2.column) as u32,
             (square1.row - square2.row) as u32,
         )
+    }
+
+    pub fn get_castle_squares(&self, active_color: &ActiveColor) -> [Option<Coordinates>; 2] {
+        match active_color {
+            ActiveColor::White => {
+                if !(self.castle_options.contains('K') || self.castle_options.contains('Q')) {
+                    return [None, None];
+                }
+            },
+            ActiveColor::Black => {
+                if !(self.castle_options.contains('k') || self.castle_options.contains('q')) {
+                    return [None, None];
+                }
+            }
+        }
+
+        let king_square = match active_color {
+            ActiveColor::White => &self.w_king_square.to_owned().unwrap(),
+            ActiveColor::Black => &self.b_king_square.to_owned().unwrap(),
+        };
+
+        // if self.square_is_attacked_new_board(king_square, active_color) {
+        //     return [None, None];
+        // }
+
+        let mut castle_squares: [Option<Coordinates>; 2] = [None, None];
+        for (index, castle_move) in [1i8, -1i8].iter().enumerate() {
+            if !self.square_is_attacked_new_board(
+                    &Coordinates::new_from_int(
+                        &(king_square.column + castle_move),
+                        &king_square.row,
+                ), active_color) &&
+                !self.square_is_attacked_new_board(
+                    &Coordinates::new_from_int(
+                        &(king_square.column + castle_move * 2),
+                        &king_square.row,
+                    ), active_color
+                ) {
+                castle_squares[index] = Some(king_square.clone());
+            } else {
+                castle_squares[index] = None;
+            }
+        }
+        castle_squares
     }
 }
 
