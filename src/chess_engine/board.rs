@@ -2,11 +2,13 @@ use std::char::from_u32;
 use std::collections::{HashMap, HashSet};
 use std::fmt::format;
 use std::hash::Hash;
+use std::ops::Index;
 use std::sync::Arc;
 // use crate::chess_engine::piece::Piece;
 use crate::chess_engine::piece::PieceEnum;
 use crate::chess_engine::coordinates::Coordinates;
 use crate::chess_engine::color::{ActiveColor};
+use pleco::{Board as StockfishBoard, BitMove};
 
 #[derive(Debug, Clone)]
 pub struct Board {
@@ -72,13 +74,16 @@ impl Board {
             b_king_in_check: false,
         };
         board.create_pieces_from_fen(fen);
-        // board.pieces = board.create_pieces();
-        board.calculate_possible_moves(&ActiveColor::White, &true);
-        board.calculate_possible_moves(&ActiveColor::Black, &true);
+
+        let color = board.active_color.clone();
+        board.generate_possible_moves(&color, &true);
+        board.generate_possible_moves(&color.next(), &true);
         // println!("board possible moves: {:?}", board.possible_moves);
 
-        board.update_check_status(&ActiveColor::White);
-        board.update_check_status(&ActiveColor::Black);
+        board.update_check_status(&color);
+        board.update_check_status(&color.next());
+
+        board.generate_castle_moves(&color);
         // println!("board possible moves: {:?}", board.possible_moves);
         println!("white king in check: {}, black king in check: {}", board.w_king_in_check, board.b_king_in_check);
         board
@@ -142,11 +147,16 @@ impl Board {
             }
         }
 
-        board.calculate_possible_moves(&ActiveColor::White, &true);
-        board.calculate_possible_moves(&ActiveColor::Black, &true);
+        let color = board.active_color.clone();
+        board.castle_options = board.get_castle_options_by_rook_starting_squares();
+        board.generate_possible_moves(&color, &true);
+        board.generate_possible_moves(&color.next(), &true);
 
-        board.update_check_status(&ActiveColor::White);
-        board.update_check_status(&ActiveColor::Black);
+        board.update_check_status(&color);
+        board.update_check_status(&color.next());
+
+        board.generate_castle_moves(&color);
+
         board
     }
 
@@ -248,6 +258,7 @@ impl Board {
                 }
             }
         }
+        self.castle_options = self.get_castle_options_by_rook_starting_squares();
     }
 
 
@@ -370,12 +381,25 @@ impl Board {
                         || !piece.get_possible_moves().contains(&move_to.to_string()) {
                         return false;
                     }
+
                     if piece.get_symbol() == "K" && piece.get_color() == 'w' {
                         self.w_king_square = Some(move_to.clone());
+                        if (move_to.column - move_from.column).abs() == 2 {
+                            self.castle_rook(&ActiveColor::new_from_char('w').unwrap(), move_to);
+                            self.castle_options = self.castle_options.chars().filter(|c| !c.is_uppercase()).collect();
+                        }
                     }
 
                     if piece.get_symbol() == "k" && piece.get_color() == 'b' {
                         self.b_king_square = Some(move_to.clone());
+                        if (move_to.column - move_from.column).abs() == 2 {
+                            self.castle_rook(&ActiveColor::new_from_char('b').unwrap(), move_to);
+                            self.castle_options = self.castle_options.chars().filter(|c| !c.is_lowercase()).collect();
+                        }
+                    }
+
+                    if ["R", "r"].contains(&piece.get_symbol().as_str()) {
+                        self.castle_options = self.update_castle_options_after_rook_move(move_from);
                     }
 
                     piece.set_coordinates(&move_to);
@@ -391,9 +415,11 @@ impl Board {
             self.active_color = self.active_color.next();
 
             let color_clone = self.active_color.clone();
-            self.calculate_possible_moves(&color_clone, &true);
-            self.calculate_possible_moves(&color_clone.next(), &false);
+            self.generate_possible_moves(&color_clone, &true);
+            self.generate_possible_moves(&color_clone.next(), &false);
             self.update_check_status(&color_clone);
+
+            self.generate_castle_moves(&color_clone);
 
             let s = format!("{}{}", move_from.to_string(), move_to.to_string());
             println!("make_move_str square: {}", s);
@@ -401,6 +427,95 @@ impl Board {
         self.fen = self.board_to_fen();
         println!("white king in check: {}, black king in check: {}", self.w_king_in_check, self.b_king_in_check);
         true
+    }
+
+    pub fn castle_rook(&mut self, king_color: &ActiveColor, move_to: &Coordinates) {
+        let rook_column: i8;
+        let rook_new_column: i8;
+        if move_to.column < (move_to.column - 7).abs() {
+            rook_column = 0;
+            rook_new_column = 3;
+        } else {
+            rook_column = 7;
+            rook_new_column = 5;
+        }
+
+        match king_color {
+            ActiveColor::White => {
+                self.make_move_without_move_validation(
+                    &Coordinates::new_from_int(&rook_column, &0),
+                    &Coordinates::new_from_int(&rook_new_column, &0),
+                    false,
+                );
+            },
+            ActiveColor::Black => {
+                self.make_move_without_move_validation(
+                    &Coordinates::new_from_int(&rook_column, &7),
+                    &Coordinates::new_from_int(&rook_new_column, &7),
+                    false,
+                );
+            },
+        }
+    }
+
+    pub fn update_castle_options_after_rook_move(
+        &self,
+        move_from: &Coordinates
+    ) -> String {
+        match (move_from.column, move_from.row) {
+            (0, 0) => self.castle_options.chars().filter(|c| *c != 'Q').collect(),
+            (7, 0) => self.castle_options.chars().filter(|c| *c != 'K').collect(),
+            (0, 7) => self.castle_options.chars().filter(|c| *c != 'q').collect(),
+            (7, 7) => self.castle_options.chars().filter(|c| *c != 'k').collect(),
+            _ => self.castle_options.clone(),
+        }
+    }
+
+    pub fn add_move_to_possible_moves(&mut self, move_from: &String, move_to: &String) {
+        match self.possible_moves.get_mut(move_from) {
+            Some((_, moves)) => {
+                moves.push(move_to.clone());
+            },
+            None => {
+                let piece = self.pieces.get(&Coordinates::new_from_string(move_from).unwrap()).unwrap();
+                match piece {
+                    Some(piece) => {
+                        let mut moves_vector: Vec<String> = Vec::new();
+                        moves_vector.push(move_to.clone());
+                        self.possible_moves.insert(move_from.clone(), (piece.get_symbol(), moves_vector));
+                    },
+                    _ => {},
+                }
+            },
+        }
+    }
+
+    pub fn get_castle_options_by_rook_starting_squares(&self) -> String {
+        let mut coordinates: Coordinates;
+        let mut castle_options = self.castle_options.clone();
+        let castle_symbols = ['Q', 'K', 'q', 'k'];
+        let rooks = ['R', 'R', 'r', 'r'];
+        let mut piece_option;
+
+        for (index, (column, row)) in [(0i8, 0i8), (7i8, 0i8), (0i8, 7i8), (7i8, 7i8)].iter().enumerate() {
+            coordinates = Coordinates::new_from_int(&column, &row);
+            piece_option = self.pieces.get(&coordinates);
+            match piece_option {
+                Some(piece_option) => {
+                    match piece_option {
+                        Some(piece) => {
+                            if piece.get_symbol() != rooks[index].to_string() {
+                                castle_options = castle_options.chars().filter(|c| *c != castle_symbols[index]).collect();
+                            }
+                        },
+                        _ => castle_options = castle_options.chars().filter(|c| *c != castle_symbols[index]).collect(),
+                    }
+                },
+                _ => castle_options = castle_options.chars().filter(|c| *c != castle_symbols[index]).collect(),
+
+            }
+        }
+        castle_options
     }
 
     pub fn make_move_string(&mut self, move_from: String, move_to: String) -> bool {
@@ -431,6 +546,7 @@ impl Board {
         &mut self,
         move_from: &Coordinates,
         move_to: &Coordinates,
+        update_color: bool,
     ) {
         match self.pieces.get_mut(&move_from) {
             Some(piece) => {
@@ -446,8 +562,10 @@ impl Board {
                         piece.set_coordinates(&move_to);
                         self.pieces.insert(move_from.clone(), None);
                         self.pieces.insert(move_to.clone(), Some(piece.clone()));
-                        self.active_color = self.active_color.next();
-                        self.calculate_possible_moves(&self.active_color.clone(), &false);
+                        if update_color {
+                            self.active_color = self.active_color.next();
+                        }
+                        self.generate_possible_moves(&self.active_color.clone(), &false);
                     },
                     _ => { },
                 }
@@ -579,25 +697,41 @@ impl Board {
         ))
     }
 
-    fn calculate_possible_moves(&mut self, color: &ActiveColor, calculate_check_moves: &bool) {
-        let board_clone = &self.clone();
-        // let (king_coordinates, king_color, king_in_check) = match board_clone.active_color {
-        //     ActiveColor::White => (&board_clone.w_king_square, &board_clone.active_color),
-        //     ActiveColor::Black => (&board_clone.b_king_square, &board_clone.active_color),
-        // };
+    fn generate_possible_moves(&mut self, color: &ActiveColor, calculate_check_moves: &bool) {
+        // let stockfish_board = StockfishBoard::from_fen(self.get_fen().as_str()).unwrap();
+        // let moves = stockfish_board.generate_moves();
+        // let mut move_from: String;
+        // let mut move_to: String;
         //
-        // let king_coordinates = match king_coordinates {
-        //     Some(king_coordinates) => king_coordinates,
-        //     None => return,
-        // };
+        // for piece_move in moves {
+        //     let piece_move = &piece_move.to_string();
+        //     (move_from, move_to) = (piece_move[0..2].to_string(), piece_move[2..4].to_string());
+        //     println!("move_from: {}, move_to: {}", move_from, move_to);
+        //     // self.add_move_to_possible_moves(&move_from, &move_to);
+        //
+        //     // let mut piece = self.pieces.get_mut(&Coordinates::new_from_string(move_from).unwrap()).unwrap();
+        //     // match piece {
+        //     //     Some(piece) => {
+        //     //         piece.get_possible_moves().push(move_to.clone());
+        //     //         self.pieces
+        //     //     },
+        //     // }
+        //     // println!("move: {}", pos_move.to_string());
+        // }
 
+        // println!("moves: {:?}", moves);
+        let mut validate_moves: Vec<String> = Vec::new();
+        let board_clone = &self.clone();
         for piece in self.pieces.values_mut() {
             if let Some(piece) = piece {
                 if piece.get_color() == color.to_char() {
-                    let possible_moves = piece.calculate_possible_moves(board_clone, color, calculate_check_moves);
+                    let possible_moves = piece.generate_piece_moves(board_clone, color, calculate_check_moves);
                     // println!("board:\n{}\nactive color: {}\npiece: {}\npossible moves: {:?}",
                     //          board_clone.clone().board_to_string(), self.active_color.to_char(), piece.get_symbol(), possible_moves);
                     // println!("possible_moves: {:?}", possible_moves);
+                    for m in &possible_moves {
+                        validate_moves.push(format!("{}{}", piece.get_coordinates_string(), m));
+                    }
                     self.possible_moves.insert(
                         piece.get_coordinates_string(),
                         (piece.get_symbol(), possible_moves)
@@ -605,7 +739,7 @@ impl Board {
                 }
             }
         }
-        // println!("board.possible_moves: {:?}", self.possible_moves)
+        println!("board.possible_moves: {:?}", self.possible_moves)
     }
 
     pub fn square_is_valid(&self, coordinates: &Coordinates) -> bool {
@@ -621,9 +755,6 @@ impl Board {
     pub fn square_is_capturable(&self, coordinates: &Coordinates, color: &char) -> bool {
         match self.pieces.get(&coordinates).unwrap() {
             Some(p) => {
-                // println!("first color: {}, piece: {}, color: {}", color, p.get_symbol(), p.get_color());
-                let a = p.get_color();
-                let b = *color;
                 if p.get_color() != *color {
                     return true;
                 }
@@ -669,7 +800,7 @@ impl Board {
         //     let king_color = self.get_active_color();
             // println!("board before move: {:?}", self.get_pieces_vec());
             let mut board_after_move = self.clone();
-            board_after_move.make_move_without_move_validation(from_coordinates, to_coordinates);
+            board_after_move.make_move_without_move_validation(from_coordinates, to_coordinates, true);
             // println!("board before move:\n{}", &self.clone().board_to_string());
             // let mut board_after_move = self.clone();
             // match board_after_move.pieces.get_mut(&from_coordinates) {
@@ -712,7 +843,7 @@ impl Board {
                     if piece.get_color() != color_char {
                         let mut new_piece = piece.clone();
                         // println!("Check validation: {}, {}", new_piece.get_symbol(), new_piece.get_color());
-                        new_piece.calculate_possible_moves(&self, color,&false);
+                        new_piece.generate_piece_moves(&self, color, &false);
                         // println!("Possible moves: {:?}", new_piece.get_possible_moves());
                         if new_piece.get_possible_moves().contains(&coordinates.to_string()) {
                             return true;
@@ -735,11 +866,29 @@ impl Board {
                     if piece.get_color() != color_char {
                         let mut new_piece = piece.clone();
                         // println!("Check validation: {}, {}", new_piece.get_symbol(), new_piece.get_color());
-                        new_piece.calculate_possible_moves(&new_board, color, &false);
+                        new_piece.generate_piece_moves(&new_board, color, &false);
                         // println!("Possible moves: {:?}", new_piece.get_possible_moves());
                         if new_piece.get_possible_moves().contains(&coordinates.to_string()) {
                             return true;
                         }
+                    }
+                },
+                _ => {},
+            }
+        }
+        false
+    }
+
+    pub fn square_is_visible(&self, coordinates: &Coordinates, color: &ActiveColor) -> bool {
+        let color_char = color.to_char();
+        let mut piece_enum: PieceEnum;
+        for piece in self.pieces.values() {
+            match piece {
+                Some(piece) => {
+                    piece_enum = piece.clone();
+                    piece_enum.generate_piece_moves(&self, &color.next(), &false);
+                    if piece_enum.get_color() != color_char && piece_enum.get_possible_moves().contains(&coordinates.to_string()) {
+                        return true;
                     }
                 },
                 _ => {},
@@ -772,48 +921,59 @@ impl Board {
         )
     }
 
-    pub fn get_castle_squares(&self, active_color: &ActiveColor) -> [Option<Coordinates>; 2] {
+    pub fn generate_castle_moves(&mut self, active_color: &ActiveColor) {
         match active_color {
             ActiveColor::White => {
-                if !(self.castle_options.contains('K') || self.castle_options.contains('Q')) {
-                    return [None, None];
+                if self.w_king_in_check {
+                    return;
                 }
             },
             ActiveColor::Black => {
-                if !(self.castle_options.contains('k') || self.castle_options.contains('q')) {
-                    return [None, None];
+                if self.b_king_in_check {
+                    return;
                 }
             }
         }
 
-        let king_square = match active_color {
-            ActiveColor::White => &self.w_king_square.to_owned().unwrap(),
-            ActiveColor::Black => &self.b_king_square.to_owned().unwrap(),
+        let (king_square, castle_fen) = match active_color {
+            ActiveColor::White => (&self.w_king_square.to_owned().unwrap(), ['K', 'Q']),
+            ActiveColor::Black => (&self.b_king_square.to_owned().unwrap(), ['k', 'q'])
         };
 
-        // if self.square_is_attacked_new_board(king_square, active_color) {
-        //     return [None, None];
-        // }
-
-        let mut castle_squares: [Option<Coordinates>; 2] = [None, None];
         for (index, castle_move) in [1i8, -1i8].iter().enumerate() {
-            if !self.square_is_attacked_new_board(
-                    &Coordinates::new_from_int(
-                        &(king_square.column + castle_move),
-                        &king_square.row,
-                ), active_color) &&
-                !self.square_is_attacked_new_board(
-                    &Coordinates::new_from_int(
-                        &(king_square.column + castle_move * 2),
-                        &king_square.row,
-                    ), active_color
-                ) {
-                castle_squares[index] = Some(king_square.clone());
-            } else {
-                castle_squares[index] = None;
+            let square1 = &Coordinates::new_from_int(
+                &(king_square.column + castle_move),
+                &king_square.row,
+            );
+            let square2 = &Coordinates::new_from_int(
+                &(king_square.column + castle_move * 2),
+                &king_square.row,
+            );
+
+            if self.castle_options.contains(castle_fen[index]) &&
+                self.square_is_free(square1) &&
+                !self.square_is_visible(square1, active_color) &&
+                self.square_is_free(square2) &&
+                !self.square_is_visible(square2, active_color) {
+
+                let king_piece = self.pieces.get_mut(king_square).unwrap();
+                match king_piece {
+                    Some(king_piece) => {
+                        let mut moves = king_piece.get_possible_moves();
+                        moves.push(Coordinates::new_from_int(
+                            &(king_square.column + castle_move * 2),
+                            &king_square.row,
+                        ).to_string());
+                        king_piece.set_possible_moves(moves);
+                        // castle_squares[index] = Some(Coordinates::new_from_int(
+                        //     &(king_square.column + castle_move * 2),
+                        //     &king_square.row,
+                        // ));
+                    },
+                    _ => {},
+                }
             }
         }
-        castle_squares
     }
 }
 

@@ -55,7 +55,7 @@ impl Piece for King {
         self.possible_moves = moves
     }
 
-    fn calculate_possible_moves(&mut self, board: &Board, color: &ActiveColor, calculate_check_moves: &bool) -> Vec<String> {
+    fn generate_piece_moves(&mut self, board: &Board, color: &ActiveColor, calculate_check_moves: &bool) -> Vec<String> {
         // if self.color != board.get_active_color().to_char() {
         //     self.possible_moves = Vec::new();
         //     return self.get_possible_moves();
@@ -85,7 +85,7 @@ impl Piece for King {
         }
 
         //castle squares
-        // for square in board.get_castle_squares(&board.get_active_color()) {
+        // for square in board.generate_castle_moves(&board.get_active_color()) {
         //     if let Some(square) = square {
         //         possible_moves.insert(square.to_string());
         //     }

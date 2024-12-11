@@ -46,7 +46,8 @@ impl Game {
         // let board_fen = "rnbqkb1r/pppppp1p/8/8/8/1NBQBN2/PPPPPP1P/R4K1R w KQkq - 0 1".to_string();
         // let board_fen = "rnbqkb1r/pppppp1p/8/8/8/1NBQBN2/PPPPPP1P/R3K2R w KQkq - 0 1".to_string();
         // let board_fen = "rnbqkbr1/pppppp1p/8/8/8/1NBQBN2/PPPPPP1P/R4K1R w KQkq - 0 1".to_string();
-        let board_fen = "rnbqkbr1/pppppp1p/8/8/8/1NBQBN2/PPPPPP1P/R5KR w KQkq - 0 1".to_string();
+        // let board_fen = "rnbqkbr1/pppppp1p/8/8/8/1NBQBN2/PPPPPP1P/R5KR w KQkq - 0 1".to_string();
+        let board_fen = "rnbqkbr1/pppppp1p/8/8/8/1NBQBN2/PPPPPP1P/R3K2R w KQkq - 0 1".to_string();
 
         //todo: replace uuid with i32. When the board is created, the board_id field will be updated
         let game_id = Uuid::new_v4();

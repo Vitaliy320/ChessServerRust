@@ -50,7 +50,7 @@ impl Piece for Queen {
         self.possible_moves = moves
     }
 
-    fn calculate_possible_moves(&mut self, board: &Board, color: &ActiveColor, calculate_check_moves: &bool) -> Vec<String> {
+    fn generate_piece_moves(&mut self, board: &Board, color: &ActiveColor, calculate_check_moves: &bool) -> Vec<String> {
         // if self.color != board.get_active_color().to_char() {
         //     self.possible_moves = Vec::new();
         //     return self.get_possible_moves();
