@@ -95,12 +95,12 @@ impl Piece for Pawn {
                 &(self.coordinates.row + direction)
             );
 
-            if board.square_is_valid(&next_square) &&
-                board.square_is_capturable(&next_square, &self.color)
-                /*&& (
-                    board.square_is_free(&next_square)
-                    || board.square_is_capturable(&next_square, &self.color)
-                )*/
+            if board.square_is_valid(&next_square) && (
+                board.square_is_capturable(&next_square, &self.color) || (
+                    board.get_active_color_string() == self.color.to_string() &&
+                    board.get_en_passant_square() == next_square.to_string()
+                )
+            )
                 && !(*calculate_check_moves && board.king_in_check_after_move(
                 &self.coordinates,
                 &next_square,

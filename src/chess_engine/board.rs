@@ -382,24 +382,60 @@ impl Board {
                         return false;
                     }
 
+                    // king moves
+                    // the king either moves one square or castles
+                    // both cases disable castles move for this king
                     if piece.get_symbol() == "K" && piece.get_color() == 'w' {
                         self.w_king_square = Some(move_to.clone());
                         if (move_to.column - move_from.column).abs() == 2 {
                             self.castle_rook(&ActiveColor::new_from_char('w').unwrap(), move_to);
-                            self.castle_options = self.castle_options.chars().filter(|c| !c.is_uppercase()).collect();
                         }
+                        self.castle_options = self.castle_options.chars().filter(|c| !c.is_uppercase()).collect();
                     }
 
                     if piece.get_symbol() == "k" && piece.get_color() == 'b' {
                         self.b_king_square = Some(move_to.clone());
                         if (move_to.column - move_from.column).abs() == 2 {
                             self.castle_rook(&ActiveColor::new_from_char('b').unwrap(), move_to);
-                            self.castle_options = self.castle_options.chars().filter(|c| !c.is_lowercase()).collect();
                         }
+                        self.castle_options = self.castle_options.chars().filter(|c| !c.is_lowercase()).collect();
                     }
 
+                    // rook moves disable castles on the rook's side
                     if ["R", "r"].contains(&piece.get_symbol().as_str()) {
                         self.castle_options = self.update_castle_options_after_rook_move(move_from);
+                    }
+
+                    if ["P", "p"].contains(&piece.get_symbol().as_str()) {
+                        // pawn captures en passant
+                        println!("en passant square: {}, move to: {}", self.en_passant_square, move_to.to_string());
+                        if move_to.to_string() == self.en_passant_square {
+                            let move_to_clone = move_to.clone();
+                            let direction = match self.active_color {
+                                ActiveColor::White => -1,
+                                ActiveColor::Black => 1,
+                            };
+
+                            let coords = Coordinates::new_from_int(
+                                &move_to_clone.column,
+                                &(move_to_clone.row + direction),
+                            );
+                            self.pieces.insert(
+                                coords,
+                                None,
+                            );
+                        }
+                        // en passant square
+                        if move_from.row == 1 && move_to.row == 3 {
+                            self.en_passant_square = Coordinates::new_from_int(&move_to.column, &(move_to.row - 1)).to_string();
+                        } else if move_from.row == 6 && move_to.row == 4 {
+                            self.en_passant_square = Coordinates::new_from_int(&move_to.column, &(move_to.row + 1)).to_string();
+                        }
+                        else {
+                            self.en_passant_square = "-".to_string();
+                        }
+                    } else {
+                        self.en_passant_square = "-".to_string();
                     }
 
                     piece.set_coordinates(&move_to);

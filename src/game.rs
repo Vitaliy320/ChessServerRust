@@ -43,11 +43,16 @@ impl Game {
         let board_size = 8;
         let board_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string();
         // let board_fen = "rnbq1bnr/pppppppp/3k4/8/2K5/8/PPPPPPPP/RNBQ1BNR w KQkq - 0 1".to_string();
+
+        // checks, castles
         // let board_fen = "rnbqkb1r/pppppp1p/8/8/8/1NBQBN2/PPPPPP1P/R4K1R w KQkq - 0 1".to_string();
         // let board_fen = "rnbqkb1r/pppppp1p/8/8/8/1NBQBN2/PPPPPP1P/R3K2R w KQkq - 0 1".to_string();
         // let board_fen = "rnbqkbr1/pppppp1p/8/8/8/1NBQBN2/PPPPPP1P/R4K1R w KQkq - 0 1".to_string();
         // let board_fen = "rnbqkbr1/pppppp1p/8/8/8/1NBQBN2/PPPPPP1P/R5KR w KQkq - 0 1".to_string();
-        let board_fen = "rnbqkbr1/pppppp1p/8/8/8/1NBQBN2/PPPPPP1P/R3K2R w KQkq - 0 1".to_string();
+        // let board_fen = "rnbqkbr1/pppppp1p/8/8/8/1NBQBN2/PPPPPP1P/R3K2R w KQkq - 0 1".to_string();
+
+        // en passant
+        let board_fen = "rnbqkbnr/pppppppp/8/3P1P2/8/8/PPP1P1PP/RNBQKBNR w KQkq - 0 1".to_string();
 
         //todo: replace uuid with i32. When the board is created, the board_id field will be updated
         let game_id = Uuid::new_v4();
