@@ -7,8 +7,10 @@ use std::sync::Arc;
 // use crate::chess_engine::piece::Piece;
 use crate::chess_engine::piece::PieceEnum;
 use crate::chess_engine::coordinates::Coordinates;
-use crate::chess_engine::color::{ActiveColor};
+use crate::chess_engine::color::{ActiveColor, Color};
 use pleco::{Board as StockfishBoard, BitMove};
+use crate::game_status::GameStatus;
+use crate::game_end_condition::GameEndCondition;
 
 #[derive(Debug, Clone)]
 pub struct Board {
@@ -465,6 +467,63 @@ impl Board {
         true
     }
 
+    pub fn make_move_string(&mut self, move_from: String, move_to: String) -> bool {
+
+        if (move_from.len(), move_to.len()) != (2, 2)
+            || !self.columns_set.contains(&move_from.chars().nth(0).unwrap())
+            || !self.rows_set.contains(&move_from.chars().nth(1).unwrap())
+            || !self.columns_set.contains(&move_to.chars().nth(0).unwrap())
+            || !self.rows_set.contains(&move_to.chars().nth(1).unwrap()) {
+            return false;
+        }
+
+        let move_from = Coordinates::new_from_string(&move_from).unwrap();
+        let move_to = Coordinates::new_from_string(&move_to).unwrap();
+
+        self.make_move(&move_from, &move_to, true)
+    }
+
+    pub fn make_move_chars(&mut self, move_from: (char, char), move_to: (char, char)) -> bool {
+        self.make_move(
+            &Coordinates::new_from_char(&move_from.0, &move_from.1),
+            &Coordinates::new_from_char(&move_to.0, &move_to.1),
+            true
+        )
+    }
+
+    pub fn make_move_without_move_validation(
+        &mut self,
+        move_from: &Coordinates,
+        move_to: &Coordinates,
+        update_color: bool,
+    ) {
+        match self.pieces.get_mut(&move_from) {
+            Some(piece) => {
+                match piece.take() {
+                    Some(mut piece) => {
+                        if piece.get_symbol() == "K" && piece.get_color() == 'w' {
+                            self.w_king_square = Some(move_to.clone());
+                        }
+
+                        if piece.get_symbol() == "k" && piece.get_color() == 'b' {
+                            self.b_king_square = Some(move_to.clone());
+                        }
+                        piece.set_coordinates(&move_to);
+                        self.pieces.insert(move_from.clone(), None);
+                        self.pieces.insert(move_to.clone(), Some(piece.clone()));
+                        if update_color {
+                            self.active_color = self.active_color.next();
+                        }
+                        self.generate_possible_moves(&self.active_color.clone(), &false);
+                    },
+                    _ => { },
+                }
+            }
+
+            _ => { },
+        };
+    }
+
     pub fn castle_rook(&mut self, king_color: &ActiveColor, move_to: &Coordinates) {
         let rook_column: i8;
         let rook_new_column: i8;
@@ -554,63 +613,6 @@ impl Board {
         castle_options
     }
 
-    pub fn make_move_string(&mut self, move_from: String, move_to: String) -> bool {
-
-        if (move_from.len(), move_to.len()) != (2, 2)
-            || !self.columns_set.contains(&move_from.chars().nth(0).unwrap())
-            || !self.rows_set.contains(&move_from.chars().nth(1).unwrap())
-            || !self.columns_set.contains(&move_to.chars().nth(0).unwrap())
-            || !self.rows_set.contains(&move_to.chars().nth(1).unwrap()) {
-            return false;
-        }
-
-        let move_from = Coordinates::new_from_string(&move_from).unwrap();
-        let move_to = Coordinates::new_from_string(&move_to).unwrap();
-
-        self.make_move(&move_from, &move_to, true)
-    }
-
-    pub fn make_move_chars(&mut self, move_from: (char, char), move_to: (char, char)) -> bool {
-        self.make_move(
-            &Coordinates::new_from_char(&move_from.0, &move_from.1),
-            &Coordinates::new_from_char(&move_to.0, &move_to.1),
-            true
-        )
-    }
-
-    pub fn make_move_without_move_validation(
-        &mut self,
-        move_from: &Coordinates,
-        move_to: &Coordinates,
-        update_color: bool,
-    ) {
-        match self.pieces.get_mut(&move_from) {
-            Some(piece) => {
-                match piece.take() {
-                    Some(mut piece) => {
-                        if piece.get_symbol() == "K" && piece.get_color() == 'w' {
-                            self.w_king_square = Some(move_to.clone());
-                        }
-
-                        if piece.get_symbol() == "k" && piece.get_color() == 'b' {
-                            self.b_king_square = Some(move_to.clone());
-                        }
-                        piece.set_coordinates(&move_to);
-                        self.pieces.insert(move_from.clone(), None);
-                        self.pieces.insert(move_to.clone(), Some(piece.clone()));
-                        if update_color {
-                            self.active_color = self.active_color.next();
-                        }
-                        self.generate_possible_moves(&self.active_color.clone(), &false);
-                    },
-                    _ => { },
-                }
-            }
-
-            _ => { },
-        };
-    }
-
     pub fn update_check_status(&mut self, color: &ActiveColor) {
         let mut board_clone = self.clone();
 
@@ -639,7 +641,7 @@ impl Board {
         *king_in_check = false;
     }
 
-    pub fn board_to_string(&mut self) -> String {
+    pub fn board_to_string(&self) -> String {
         //todo: refactor to get rid of self.squares_vec or remove
 
         let mut rows_vector: Vec<String> = Vec::new();
@@ -684,7 +686,7 @@ impl Board {
         dict
     }
 
-    pub fn board_to_dict_by_active_color(&mut self) -> HashMap<String, (String, Vec<String>)> {
+    pub fn board_to_dict_by_active_color(&self) -> HashMap<String, (String, Vec<String>)> {
         let mut dict: HashMap<String, (String, Vec<String>)> = HashMap::new();
         // todo: add calculation of possible moves for each piece in given position
 
@@ -1010,6 +1012,43 @@ impl Board {
                 }
             }
         }
+    }
+
+    pub fn get_game_status_and_end_condition(&self) -> (GameStatus, GameEndCondition) {
+        // todo: add time out game end condition
+        // todo: add draw by repetition, players' agreement,
+        // todo: 50 moves without captures, insufficient material
+
+        let mut player_has_moves = false;
+        for piece in self.pieces.values() {
+            match piece {
+                Some(piece) => {
+                    if piece.get_color() == self.active_color.to_char()
+                        && piece.get_possible_moves().len() > 0 {
+                        player_has_moves = true;
+                        break;
+                    }
+                },
+                _ => {},
+            }
+        }
+
+
+        if !player_has_moves {
+            return match (&self.active_color, self.king_is_in_check(&self.active_color)) {
+                (ActiveColor::White, true) => {
+                    (GameStatus::Finished, GameEndCondition::BlackCheckmatedWhite)
+                },
+                (ActiveColor::Black, true) => {
+                    (GameStatus::Finished, GameEndCondition::WhiteCheckmatedBlack)
+                },
+                (_, false) => {
+                    (GameStatus::Finished, GameEndCondition::Stalemate)
+                },
+            }
+        }
+
+        (GameStatus::Ongoing, GameEndCondition::None)
     }
 }
 

@@ -137,37 +137,33 @@ impl GameRepository {
                 FOREIGN KEY (board_id) REFERENCES boards (id) ON DELETE CASCADE
                 );", &[]).await;
 
-                match game.get_board() {
-                    Some(board) => {
-                        match self.add_board_to_boards(board).await {
-                            Ok(board_id) => {
-                                let result = db_client.query_one("
-                                INSERT INTO games (id, board_id, user1_id, user2_id, white_id,
-                                black_id, status, game_end_condition) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
-                                &[
-                                    &game.get_game_id(),
-                                    &board_id,
-                                    &game.get_user1_id(),
-                                    &game.get_user2_id(),
-                                    &game.get_white_id(),
-                                    &game.get_black_id(),
-                                    &game.get_game_status(),
-                                    &game.get_game_end_condition(),
-                                ]).await;
+                let board = game.get_board_mut();
+                match self.add_board_to_boards(board).await {
+                    Ok(board_id) => {
+                        let result = db_client.query_one("
+                        INSERT INTO games (id, board_id, user1_id, user2_id, white_id,
+                        black_id, status, game_end_condition) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+                        &[
+                            &game.get_game_id(),
+                            &board_id,
+                            &game.get_user1_id(),
+                            &game.get_user2_id(),
+                            &game.get_white_id(),
+                            &game.get_black_id(),
+                            &game.get_game_status(),
+                            &game.get_game_end_condition(),
+                        ]).await;
 
-                                match result {
-                                    Ok(row) => {
-                                        let game_id: Uuid = row.get::<usize, Uuid>(0);
-                                        println!("Game created successfully");
-                                        Ok(game_id)
-                                    },
-                                    Err(_) => Err("Could not add game".to_string()),
-                                }
+                        match result {
+                            Ok(row) => {
+                                let game_id: Uuid = row.get::<usize, Uuid>(0);
+                                println!("Game created successfully");
+                                Ok(game_id)
                             },
-                            Err(e) => Err(e),
+                            Err(_) => Err("Could not add game".to_string()),
                         }
                     },
-                    _ => Err("Could not find the board".to_string()),
+                    Err(e) => Err(e),
                 }
             },
             _ => Err("Could not connect to the database".to_string()),

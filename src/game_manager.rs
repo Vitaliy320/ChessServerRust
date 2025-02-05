@@ -60,6 +60,10 @@ impl GameManager {
         }
     }
 
+    pub async fn update_game_by_id(&self, game: &Game) -> Result<(), String> {
+        self.game_repository.update_game_by_id(game).await
+    }
+
     pub async fn update_board_by_id(&mut self, board_id: i32) {
 
     }

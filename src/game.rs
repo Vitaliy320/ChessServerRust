@@ -5,6 +5,7 @@ use crate::game_status::GameStatus;
 use crate::chess_engine::board::Board;
 use crate::game_end_condition::GameEndCondition;
 use crate::chess_engine::color::ActiveColor;
+use crate::chess_engine::coordinates::Coordinates;
 
 #[derive(Clone, Debug)]
 pub struct Game {
@@ -17,7 +18,7 @@ pub struct Game {
     pub color_by_user_id: HashMap<String, ActiveColor>,
     status: GameStatus,
     game_end_condition: GameEndCondition,
-    board: Option<Board>,
+    board: Board,
 }
 
 impl Game {
@@ -52,7 +53,7 @@ impl Game {
         // let board_fen = "rnbqkbr1/pppppp1p/8/8/8/1NBQBN2/PPPPPP1P/R3K2R w KQkq - 0 1".to_string();
 
         // en passant
-        let board_fen = "rnbqkbnr/pppppppp/8/3P1P2/8/8/PPP1P1PP/RNBQKBNR w KQkq - 0 1".to_string();
+        // let board_fen = "rnbqkbnr/pppppppp/8/3P1P2/8/8/PPP1P1PP/RNBQKBNR w KQkq - 0 1".to_string();
 
         //todo: replace uuid with i32. When the board is created, the board_id field will be updated
         let game_id = Uuid::new_v4();
@@ -69,7 +70,7 @@ impl Game {
             status: GameStatus::AwaitingOpponent,
             game_end_condition: GameEndCondition::None,
             board_id: None,
-            board: Some(board),
+            board,
         };
 
         game
@@ -110,17 +111,21 @@ impl Game {
             white_id,
             black_id,
             color_by_user_id,
-            board: Some(board),
+            board,
             status,
             game_end_condition,
         }
     }
 
-    pub fn get_board(&mut self) -> Option<&mut Board> {
-        self.board.as_mut()
+    pub fn get_board(&self) -> &Board {
+        &self.board
+    }
+
+    pub fn get_board_mut(&mut self) -> &mut Board {
+        &mut self.board
     }
     pub fn set_board(&mut self, board: Board) {
-        self.board = Some(board);
+        self.board = board;
     }
 
     pub fn get_board_id(&self) -> Option<i32> {
@@ -173,6 +178,14 @@ impl Game {
         self.game_id.clone()
     }
 
+    pub fn get_active_color(&self) -> ActiveColor {
+        self.board.get_active_color()
+    }
+
+    pub fn get_game_status_and_end_condition(&self) -> (GameStatus, GameEndCondition) {
+        self.board.get_game_status_and_end_condition()
+    }
+
     pub fn get_game_status(&self) -> GameStatus {
         self.status.clone()
     }
@@ -182,5 +195,32 @@ impl Game {
 
     pub fn get_users(&self) -> (Option<String>, Option<String>) {
         (self.user1_id.clone(), self.user2_id.clone())
+    }
+
+    pub fn update_game_status_and_end_condition(&mut self) {
+        (self.status, self.game_end_condition) = self.board.get_game_status_and_end_condition();
+    }
+
+    pub fn make_move(
+        &mut self,
+        move_from: &Coordinates,
+        move_to: &Coordinates,
+        calculate_new_moves: bool,
+    ) -> bool {
+        let result = self.board.make_move(move_from, move_to, calculate_new_moves);
+        self.update_game_status_and_end_condition();
+        result
+    }
+
+    pub fn make_move_string(&mut self, move_from: String, move_to: String) -> bool {
+        let result = self.board.make_move_string(move_from, move_to);
+        self.update_game_status_and_end_condition();
+        result
+    }
+
+    pub fn make_move_chars(&mut self, move_from: (char, char), move_to: (char, char)) -> bool {
+        let result = self.board.make_move_chars(move_from, move_to);
+        self.update_game_status_and_end_condition();
+        result
     }
 }
