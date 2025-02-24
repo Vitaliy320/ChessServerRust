@@ -206,20 +206,21 @@ impl Game {
         move_from: &Coordinates,
         move_to: &Coordinates,
         calculate_new_moves: bool,
+        promotion_piece: Option<String>
     ) -> bool {
-        let result = self.board.make_move(move_from, move_to, calculate_new_moves);
+        let result = self.board.make_move(move_from, move_to, calculate_new_moves, promotion_piece);
         self.update_game_status_and_end_condition();
         result
     }
 
-    pub fn make_move_string(&mut self, move_from: String, move_to: String) -> bool {
-        let result = self.board.make_move_string(move_from, move_to);
+    pub fn make_move_string(&mut self, move_from: String, move_to: String, promotion_piece: Option<String>) -> bool {
+        let result = self.board.make_move_string(move_from, move_to, promotion_piece);
         self.update_game_status_and_end_condition();
         result
     }
 
-    pub fn make_move_chars(&mut self, move_from: (char, char), move_to: (char, char)) -> bool {
-        let result = self.board.make_move_chars(move_from, move_to);
+    pub fn make_move_chars(&mut self, move_from: (char, char), move_to: (char, char), promotion_piece: Option<String>) -> bool {
+        let result = self.board.make_move_chars(move_from, move_to, promotion_piece);
         self.update_game_status_and_end_condition();
         result
     }

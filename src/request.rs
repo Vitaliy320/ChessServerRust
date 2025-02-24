@@ -37,6 +37,7 @@ pub struct MakeMoveRequest {
     pub user_id: String,
     pub from: String,
     pub to: String,
+    pub promotion_piece: Option<String>,
 }
 
 //

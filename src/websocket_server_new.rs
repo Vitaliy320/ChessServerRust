@@ -92,8 +92,8 @@ async fn handle_connection(game_manager: Arc<RwLock<GameManager>>, event_service
                     authorize(Arc::clone(&game_manager_clone), Arc::clone(&event_service_clone), game_id, user_id, addr, tx_clone).await;
                 },
 
-                RequestEnum::MakeMoveRequest(MakeMoveRequest { game_id, user_id, from, to }) => {
-                    let r = make_move(Arc::clone(&game_manager_clone), Arc::clone(&event_service_clone), game_id, user_id, from, to).await;
+                RequestEnum::MakeMoveRequest(MakeMoveRequest { game_id, user_id, from, to , promotion_piece}) => {
+                    let r = make_move(Arc::clone(&game_manager_clone), Arc::clone(&event_service_clone), game_id, user_id, from, to, promotion_piece).await;
                     // return Ok(());
                 },
 
@@ -170,7 +170,8 @@ async fn make_move(
     game_id: Uuid,
     user_id: String,
     from: String,
-    to: String
+    to: String,
+    promotion_piece: Option<String>,
 ) -> Response {
     // get player color
     let mut user_color: Option<ActiveColor> = None;
@@ -203,7 +204,7 @@ async fn make_move(
                     },
                 }
 
-                match game.make_move_string(from.clone(), to.clone()) {
+                match game.make_move_string(from.clone(), to.clone(), promotion_piece) {
                     true => move_made = true,
                     _ => return Response::RequestFailedResponse {
                         message: "Could not make a move".to_string()

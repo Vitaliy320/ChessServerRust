@@ -359,6 +359,7 @@ impl Board {
         move_from: &Coordinates,
         move_to: &Coordinates,
         calculate_new_moves: bool,
+        promotion_piece: Option<String>
     ) -> bool {
         // todo: update board in database
         {
@@ -403,12 +404,54 @@ impl Board {
                         self.castle_options = self.castle_options.chars().filter(|c| !c.is_lowercase()).collect();
                     }
 
-                    // rook moves disable castles on the rook's side
+                    // rook moves and captures disable castles on the rook's side
                     if ["R", "r"].contains(&piece.get_symbol().as_str()) {
-                        self.castle_options = self.update_castle_options_after_rook_move(move_from);
+                        self.castle_options = self.update_castle_options_after_rook_move(move_from, move_to);
                     }
 
+                    match self.pieces.get(move_to) {
+                        Some(piece) => {
+                            match piece {
+                                Some(piece) => {
+                                    if ["R", "r"].contains(&piece.get_symbol().as_str()) {
+                                        self.castle_options = self.update_castle_options_after_rook_move(move_from, move_to);
+                                    }
+                                },
+                                _ => {},
+                            }
+                        },
+                        _ => {},
+                    }
+
+                    // pawn moves
                     if ["P", "p"].contains(&piece.get_symbol().as_str()) {
+                        // pawn promotion
+                        if move_to.row == 7 && piece.get_symbol().as_str() == "P" {
+                            match promotion_piece {
+                                Some(promotion_piece) => {
+                                    if ["Q", "R", "B", "N"].contains(&promotion_piece.as_str()) {
+                                        piece = PieceEnum::new(move_to.clone(), promotion_piece.chars().nth(0).unwrap());
+                                    } else {
+                                        return false;
+                                    }
+                                },
+                                _ => return false,
+                            }
+                        }
+
+                        else if move_to.row == 0 && piece.get_symbol().as_str() == "p" {
+                            match promotion_piece {
+                                Some(promotion_piece) => {
+                                    if ["q", "r", "b", "n"].contains(&promotion_piece.as_str()) {
+                                        piece = PieceEnum::new(move_to.clone(), promotion_piece.chars().nth(0).unwrap());
+                                    } else {
+                                        return false;
+                                    }
+                                },
+                                _ => return false,
+                            }
+                        }
+
                         // pawn captures en passant
                         println!("en passant square: {}, move to: {}", self.en_passant_square, move_to.to_string());
                         if move_to.to_string() == self.en_passant_square {
@@ -467,7 +510,7 @@ impl Board {
         true
     }
 
-    pub fn make_move_string(&mut self, move_from: String, move_to: String) -> bool {
+    pub fn make_move_string(&mut self, move_from: String, move_to: String, promotion_piece: Option<String>) -> bool {
 
         if (move_from.len(), move_to.len()) != (2, 2)
             || !self.columns_set.contains(&move_from.chars().nth(0).unwrap())
@@ -480,14 +523,15 @@ impl Board {
         let move_from = Coordinates::new_from_string(&move_from).unwrap();
         let move_to = Coordinates::new_from_string(&move_to).unwrap();
 
-        self.make_move(&move_from, &move_to, true)
+        self.make_move(&move_from, &move_to, true, promotion_piece)
     }
 
-    pub fn make_move_chars(&mut self, move_from: (char, char), move_to: (char, char)) -> bool {
+    pub fn make_move_chars(&mut self, move_from: (char, char), move_to: (char, char), promotion_piece: Option<String>) -> bool {
         self.make_move(
             &Coordinates::new_from_char(&move_from.0, &move_from.1),
             &Coordinates::new_from_char(&move_to.0, &move_to.1),
-            true
+            true,
+            promotion_piece,
         )
     }
 
@@ -555,15 +599,25 @@ impl Board {
 
     pub fn update_castle_options_after_rook_move(
         &self,
-        move_from: &Coordinates
+        move_from: &Coordinates,
+        move_to: &Coordinates
     ) -> String {
-        match (move_from.column, move_from.row) {
+        let mut castle_options = match (move_from.column, move_from.row) {
             (0, 0) => self.castle_options.chars().filter(|c| *c != 'Q').collect(),
             (7, 0) => self.castle_options.chars().filter(|c| *c != 'K').collect(),
             (0, 7) => self.castle_options.chars().filter(|c| *c != 'q').collect(),
             (7, 7) => self.castle_options.chars().filter(|c| *c != 'k').collect(),
             _ => self.castle_options.clone(),
-        }
+        };
+
+        castle_options = match (move_to.column, move_to.row) {
+            (0, 0) => castle_options.chars().filter(|c| *c != 'Q').collect(),
+            (7, 0) => castle_options.chars().filter(|c| *c != 'K').collect(),
+            (0, 7) => castle_options.chars().filter(|c| *c != 'q').collect(),
+            (7, 7) => castle_options.chars().filter(|c| *c != 'k').collect(),
+            _ => castle_options.clone(),
+        };
+        castle_options
     }
 
     pub fn add_move_to_possible_moves(&mut self, move_from: &String, move_to: &String) {
@@ -764,9 +818,6 @@ impl Board {
             if let Some(piece) = piece {
                 if piece.get_color() == color.to_char() {
                     let possible_moves = piece.generate_piece_moves(board_clone, color, calculate_check_moves);
-                    // println!("board:\n{}\nactive color: {}\npiece: {}\npossible moves: {:?}",
-                    //          board_clone.clone().board_to_string(), self.active_color.to_char(), piece.get_symbol(), possible_moves);
-                    // println!("possible_moves: {:?}", possible_moves);
                     for m in &possible_moves {
                         validate_moves.push(format!("{}{}", piece.get_coordinates_string(), m));
                     }
@@ -831,37 +882,10 @@ impl Board {
         from_coordinates: &Coordinates,
         to_coordinates: &Coordinates,
         king_color: &ActiveColor,
-        // calculate_check_moves: &bool,
     ) -> bool {
-        // match calculate_check_moves {
-        //     true => {
-        //     let king_color = self.get_active_color();
-            // println!("board before move: {:?}", self.get_pieces_vec());
             let mut board_after_move = self.clone();
             board_after_move.make_move_without_move_validation(from_coordinates, to_coordinates, true);
-            // println!("board before move:\n{}", &self.clone().board_to_string());
-            // let mut board_after_move = self.clone();
-            // match board_after_move.pieces.get_mut(&from_coordinates) {
-            //     Some(piece) => {
-            //         match piece.take() {
-            //             Some(mut piece) => {
-            //                 piece.set_coordinates(&to_coordinates);
-            //                 board_after_move.pieces.insert(to_coordinates.clone(), Some(piece.clone()));
-            //                 board_after_move.pieces.insert(from_coordinates.clone(), None);
-            //             },
-            //             _ => return false,
-            //         }
-            //     }
-            //
-            //     _ => return false,
-            // };
-            // println!("board before move:\n{},\nboard after move:\n{}", &self.clone().board_to_string(), board_after_move.board_to_string());
-            // println!("board after move: {:?}", board_after_move.get_pieces_vec());
-            // board_after_move.update_active_color();
             board_after_move.king_is_in_check(&king_color)
-            // },
-            // false => false,
-        // }
     }
 
     pub fn king_is_in_check(&self, color: &ActiveColor) -> bool {
