@@ -35,6 +35,8 @@ pub struct Board {
     b_king_square: Option<Coordinates>,
     w_king_in_check: bool,
     b_king_in_check: bool,
+    moves_count: i32,
+    moves_history: String,
 }
 
 impl Board {
@@ -74,6 +76,8 @@ impl Board {
             b_king_square: None,
             w_king_in_check: false,
             b_king_in_check: false,
+            moves_count: 0,
+            moves_history: String::new(),
         };
         board.create_pieces_from_fen(fen);
 
@@ -104,6 +108,8 @@ impl Board {
         number_of_rows: i32,
         columns: String,
         rows: String,
+        moves_count: i32,
+        moves_history: &str,
     ) -> Board {
         //todo: update to get w_king_square and b_king_square from pieces
         let active_color_enum = match active_color {
@@ -138,6 +144,8 @@ impl Board {
             b_king_square: None,
             w_king_in_check: false,
             b_king_in_check: false,
+            moves_count,
+            moves_history: moves_history.to_string(),
         };
 
         for row in board.rows.chars() {
@@ -263,6 +271,9 @@ impl Board {
         self.castle_options = self.get_castle_options_by_rook_starting_squares();
     }
 
+    pub fn get_id(&self) -> Option<i32> {
+        self.id
+    }
 
     pub fn set_id(&mut self, id: i32) {
         self.id = Some(id);
@@ -352,6 +363,14 @@ impl Board {
 
     pub fn get_rows_set(&self) -> &HashSet<char> {
         &self.rows_set
+    }
+
+    pub fn get_moves_count(&self) -> &i32 {
+        &self.moves_count
+    }
+
+    pub fn get_moves_history(&self) -> &str {
+        self.moves_history.as_str()
     }
 
     pub fn make_move(
@@ -486,6 +505,7 @@ impl Board {
                     piece.set_coordinates(&move_to);
                     self.pieces.insert(move_from.clone(), None);
                     self.pieces.insert(move_to.clone(), Some(piece));
+                    self.add_move_to_made_moves(move_from, move_to);
                 },
                 _ => return false,
             }
@@ -1073,6 +1093,32 @@ impl Board {
         }
 
         (GameStatus::Ongoing, GameEndCondition::None)
+    }
+
+    fn add_move_to_made_moves(
+        &mut self,
+        move_from: &Coordinates,
+        move_to: &Coordinates,
+    ) {
+        match self.active_color {
+            ActiveColor::White => {
+                self.moves_count = self.moves_count + 1;
+                self.moves_history.push_str((
+                    self.moves_count.to_string() + " " +
+                        move_from.to_string().as_str() +
+                        move_to.to_string().as_str() + " "
+                ).as_str()
+                );
+            },
+            ActiveColor::Black => {
+                self.moves_history.push_str((
+                    move_from.to_string() +
+                        move_to.to_string().as_str() + "  "
+                ).as_str()
+                );
+            },
+        }
+
     }
 }
 

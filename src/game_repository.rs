@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use uuid::Uuid;
 use tokio_postgres::{Client, NoTls};
-use diesel::RunQueryDsl;
+use diesel::{IntoSql, RunQueryDsl};
 use crate::game::Game;
 use crate::game_status::GameStatus;
 
@@ -122,7 +122,7 @@ impl GameRepository {
         }
     }
 
-    pub async fn add_game_to_games(&self, game: &mut Game) -> Result<Uuid, String> {
+    pub async fn add_game_to_games(&self, game: &mut Game) -> Result<(Uuid, i32), String> {
         match &self.db_client {
             Some(db_client) => {
                 let e = db_client.execute("CREATE TABLE IF NOT EXISTS games (\
@@ -158,7 +158,7 @@ impl GameRepository {
                             Ok(row) => {
                                 let game_id: Uuid = row.get::<usize, Uuid>(0);
                                 println!("Game created successfully");
-                                Ok(game_id)
+                                Ok((game_id, board_id))
                             },
                             Err(_) => Err("Could not add game".to_string()),
                         }
@@ -221,7 +221,9 @@ impl GameRepository {
                 number_of_columns INT NOT NULL,
                 number_of_rows INT NOT NULL,
                 columns TEXT NOT NULL,
-                rows TEXT NOT NULL
+                rows TEXT NOT NULL,
+                moves_count INT NOT NULL,
+                moves_history TEXT
                 );"
                 ,&[]).await;
 
@@ -235,10 +237,12 @@ impl GameRepository {
                 let number_of_rows =      board.get_number_of_rows() as i32;
                 let columns =           board.get_columns();
                 let rows =              board.get_rows();
+                let moves_count =         *board.get_moves_count() as i32;
+                let moves_history =      board.get_moves_history().to_string();
 
                 let query = "
                 INSERT INTO boards (fen, active_color, castle_options, en_passant_square, half_move_clock, full_move_number,
-                number_of_columns, number_of_rows, columns, rows) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                number_of_columns, number_of_rows, columns, rows, moves_count, moves_history) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                 RETURNING id";
 
                 let result = db_client.query_one(query,
@@ -253,6 +257,8 @@ impl GameRepository {
                     &number_of_rows,
                     &columns,
                     &rows,
+                    &moves_count,
+                    &moves_history,
                 ]).await;
                 match result {
                     Ok(row) => {
@@ -324,7 +330,8 @@ impl GameRepository {
             Some(db_client) => {
                 let result = db_client.query_one("\
                 SELECT id, fen, active_color, castle_options, en_passant_square,
-                half_move_clock, full_move_number, number_of_columns, number_of_rows, columns, rows
+                half_move_clock, full_move_number, number_of_columns, number_of_rows, columns, rows,
+                moves_count, moves_history
                 FROM boards WHERE id = $1", &[&id]).await;
 
                 match result {
@@ -351,6 +358,8 @@ impl GameRepository {
                                     row.get("number_of_rows"),
                                     row.get("columns"),
                                     row.get("rows"),
+                                    row.get("moves_count"),
+                                    row.get("moves_history"),
                                 )),
                         }
                     }
@@ -359,12 +368,57 @@ impl GameRepository {
         }
     }
 
+    pub async fn update_board_by_id(&self, board_id: i32, board: &Board) -> Result<(), String> {
+        match &self.db_client {
+            None => Err("Could not connect to the database".to_string()),
+            Some(db_client) => {
+                let fen = board.get_fen();
+                let active_color = board.get_active_color_string();
+                let castle_options = board.get_castle_options();
+                let en_passant_square = board.get_en_passant_square();
+                let half_move_clock = board.get_half_move_clock();
+                let full_move_number = board.get_full_move_number();
+                let number_of_columns = board.get_number_of_columns() as i32;
+                let number_of_rows = board.get_number_of_rows() as i32;
+                let columns = board.get_columns();
+                let rows = board.get_rows();
+                let moves_count = *board.get_moves_count();
+                let moves_history = board.get_moves_history().to_string();
+
+                let row_updated = db_client.execute("\
+                        UPDATE boards SET fen = $1, active_color = $2, castle_options = $3,
+                        en_passant_square = $4, half_move_clock = $5, full_move_number = $6,
+                        number_of_columns = $7, number_of_rows = $8, columns = $9, rows = $10,
+                        moves_count = $11, moves_history = $12 where id = $13
+                        ", &[
+                    &fen,
+                    &active_color,
+                    &castle_options,
+                    &en_passant_square,
+                    &half_move_clock,
+                    &full_move_number,
+                    &number_of_columns,
+                    &number_of_rows,
+                    &columns,
+                    &rows,
+                    &moves_count,
+                    &moves_history,
+                    &board_id
+                ]).await;
+                match row_updated {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err("Could not update board by id".to_string())
+                }
+            }
+        }
+    }
+
     pub async fn get_pieces_by_board_id(&self, id: i32) -> Result<HashMap<Coordinates, Option<PieceEnum>>, String>{
         match &self.db_client {
             None => Err("Could not connect to the database".to_string()),
             Some(db_client) => {
                 let result = db_client.query("\
-                SELECT id, board_id, coordinates, color, name, symbolgit remote -v
+                SELECT id, board_id, coordinates, color, name, symbol
                 from pieces where board_id = $1", &[&id]).await;
                 match result {
                     Err(_) => Err("Could not get pieces".to_string()),
@@ -392,7 +446,7 @@ impl GameRepository {
         }
     }
 
-    pub async fn update_game_by_id(&self, game: &Game) -> Result<(), String> {
+    pub async fn update_game_by_id_db(&self, game: &Game) -> Result<(), String> {
         match &self.db_client {
             None => Err("Could not connect to the database".to_string()),
             Some(db_client) => {

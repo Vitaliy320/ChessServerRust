@@ -132,6 +132,10 @@ impl Game {
         self.board_id
     }
 
+    pub fn set_board_id(&mut self, board_id: i32) {
+        self.board_id = Some(board_id);
+    }
+
     pub fn set_user(&mut self, user1_id: Option<String>, user2_id: Option<String>) {
         // todo: refactor
         match user1_id {

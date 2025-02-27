@@ -45,7 +45,7 @@ pub async fn create_game(
     let game = Game::new(user_id.clone(), color);
     let response = game_manager_lock.add_game_to_games(game.clone()).await;
     match response {
-        Ok(game_id) => {
+        Ok((game_id, _)) => {
             let _ = game_manager_lock.connection_manager.add_connection(
                 &game.get_game_id(),
                 &user_id,
@@ -106,7 +106,7 @@ pub async fn join_game(
         let game = game_manager_lock.get_game_by_id(&game_id).await;
         match game {
             Ok(game) => {
-                let _ = game_manager_lock.game_repository.update_game_by_id(game).await;
+                let _ = game_manager_lock.game_repository.update_game_by_id_db(game).await;
                 match game.get_users() {
                     (Some(_), _) | (_, Some(_)) => {
                         Response::JoinGameResponse {

@@ -223,42 +223,60 @@ async fn make_move(
         };
     };
 
-    // create response
-    let g_m_guard = game_manager.read().await;
-    let game = g_m_guard.get_game_by_id(&game_id).await;
-    let response = match game {
-        Ok(game) => {
-            match move_made {
-                true => {
-                    let board = game.get_board();
-                    let result = "Made move: ".to_string()
-                        + from.clone().as_str()
-                        + " "
-                        + to.clone().as_str()
-                        + "\n"
-                        + board.board_to_string().as_str();
-                    println!("{}", result);
-                    let _ = g_m_guard.update_game_by_id(game).await;
-                    Response::MakeMoveResponse {
-                        game_id,
-                        message: format!("Made move from {} to {}", from, to),
-                        columns: board.get_columns(),
-                        rows: board.get_rows(),
-                        board: board.board_to_dict_by_active_color(),
-                        game_status: game.get_game_status(),
-                        game_end_condition: game.get_game_end_condition(),
-                    }
-                },
-                false => Response::RequestFailedResponse {
-                    message: "Could not make a move".to_string()
-                },
-            }
-        },
-        Err(_) => return Response::RequestFailedResponse {
-            message: "Game deleted before response sent".to_string()
-        }
-
+    // make a move, create a response
+    let mut response = Response::RequestFailedResponse {
+        message: "Could not make a move".to_string(),
     };
+    {
+        let g_m_guard = game_manager.read().await;
+        let game = g_m_guard.get_game_by_id(&game_id).await;
+        response = match game {
+            Ok(game) => {
+                match move_made {
+                    true => {
+                        let board = game.get_board();
+                        let result = "Made move: ".to_string()
+                            + from.clone().as_str()
+                            + " "
+                            + to.clone().as_str()
+                            + "\n"
+                            + board.board_to_string().as_str();
+                        println!("{}", result);
+
+                        Response::MakeMoveResponse {
+                            game_id,
+                            message: format!("Made move from {} to {}", from, to),
+                            columns: board.get_columns(),
+                            rows: board.get_rows(),
+                            board: board.board_to_dict_by_active_color(),
+                            game_status: game.get_game_status(),
+                            game_end_condition: game.get_game_end_condition(),
+                        }
+                    },
+                    false => Response::RequestFailedResponse {
+                        message: "Could not make a move".to_string()
+                    },
+                }
+            },
+            Err(_) => return Response::RequestFailedResponse {
+                message: "Game deleted before response sent".to_string()
+            }
+
+        };
+    }
+    // update game in memory and db
+    {
+        let mut g_m_guard_mut = game_manager.write().await;
+        let _ = g_m_guard_mut.update_game_by_id(&game_id).await;
+    }
+
+    // update board in memory and db
+    // {
+    //     let mut g_m_guard_mut = game_manager.write().await;
+    //     let _ = g_m_guard_mut.update_board_by_game_id(&game_id).await;
+    //     // todo
+    // }
+    // let _ = g_m_guard.update_board_by_id(board.get_id().unwrap()).await;
 
     event_service.read().await.publish(&response).await;
     response
