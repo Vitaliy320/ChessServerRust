@@ -270,14 +270,6 @@ async fn make_move(
         let _ = g_m_guard_mut.update_game_by_id(&game_id).await;
     }
 
-    // update board in memory and db
-    // {
-    //     let mut g_m_guard_mut = game_manager.write().await;
-    //     let _ = g_m_guard_mut.update_board_by_game_id(&game_id).await;
-    //     // todo
-    // }
-    // let _ = g_m_guard.update_board_by_id(board.get_id().unwrap()).await;
-
     event_service.read().await.publish(&response).await;
     response
 }
